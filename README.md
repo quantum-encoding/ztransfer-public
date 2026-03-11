@@ -1,180 +1,144 @@
 # ztransfer
 
-Secure LAN file transfer with post-quantum authentication.
+Secure file transfer and remote access with post-quantum authentication.
 
-Transfer files between machines on your local network using **ML-DSA-65** (FIPS 204) digital signatures for identity verification and **TLS 1.3** for transport encryption. One-time TOFU (Trust On First Use) pairing, then seamless authenticated transfers.
+Transfer files between machines on your LAN, or remotely control machines across networks using encrypted tunnels with warp codes.
 
 ## Features
 
-- **Post-quantum authentication** — ML-DSA-65 signatures (via Zig FFI)
-- **TOFU pairing** — One-time token exchange, then permanent trust
-- **CLI + GUI** — Full command-line tool and cross-platform Fyne desktop app
-- **REST API** — Local HTTP API for programmatic access (great for AI agents)
-- **Claude Code plugin** — Included plugin for AI-assisted file transfers
-- **Cross-platform** — macOS (arm64/amd64), Linux (amd64/arm64)
+- **Post-quantum auth** — ML-DSA-65 signatures (FIPS 204) for all operations
+- **TLS 1.3** — Encrypted transport with self-signed certs
+- **Remote shell** — Interactive PTY over encrypted UDP tunnel
+- **Remote exec** — Run commands on remote machines
+- **NAT traversal** — STUN + UDP hole punching for cross-network access
+- **Warp codes** — Human-readable connection codes (`warp-729-alpha`)
+- **REST API** — Claude Code integration for programmatic access
+- **Cross-platform** — macOS (arm64/amd64) and Linux (amd64/arm64)
+- **GUI** — Cross-platform desktop app via Fyne
 
 ## Quick Start
 
-### Install
+### File Transfer (LAN)
 
+**On the machine sharing files:**
 ```bash
-# Build from source (requires Go 1.22+ and prebuilt libquantum_vault.a)
-git clone https://github.com/quantum-encoding/ztransfer-public.git
-cd ztransfer-public
-go build -o ztransfer ./cmd/ztransfer/
+ztransfer serve --dir ~/shared
 ```
 
-### Usage
-
-**Machine A** (server):
+**On the other machine, pair once:**
 ```bash
-ztransfer serve --dir ~/shared --port 9876
-# Displays a one-time pairing token
-```
-
-**Machine B** (client):
-```bash
-# Pair (one-time)
 ztransfer pair 192.168.1.100:9876 --token ABC123
-
-# List files
-ztransfer ls machine-a:/
-
-# Download
-ztransfer get machine-a:/document.pdf /tmp/
-
-# Upload
-ztransfer put ./report.csv machine-a:/inbox/
 ```
 
-### API Mode
+**Then transfer files:**
+```bash
+ztransfer ls peer:/
+ztransfer get peer:/file.txt
+ztransfer put ./local-file.txt peer:/
+```
 
-Start the local REST API for programmatic access:
+### Remote Access
+
+**On the remote machine:**
+```bash
+ztransfer remote host
+# Prints: warp-429-delta
+```
+
+**On your machine:**
+```bash
+# Interactive shell
+ztransfer remote shell warp-429-delta
+
+# Run a single command
+ztransfer remote exec warp-429-delta "sudo pacman -S brave-bin"
+```
+
+### Claude Code API
+
+Start the API server for programmatic access:
 
 ```bash
-ztransfer api --port 9877
+ztransfer api
 ```
 
-Then use curl (or any HTTP client):
+Then from Claude Code or any HTTP client:
 
 ```bash
 # List peers
 curl http://localhost:9877/api/peers
 
 # List remote files
-curl 'http://localhost:9877/api/ls?peer=machine-a&path=/'
+curl 'http://localhost:9877/api/ls?peer=archbox&path=/'
 
-# Download
+# Download a file
 curl -X POST http://localhost:9877/api/get \
-  -d '{"peer":"machine-a","remote_path":"/file.txt","local_path":"/tmp/"}'
+  -d '{"peer":"archbox","remote_path":"/data.csv","local_path":"/tmp/"}'
 
-# Upload
-curl -X POST http://localhost:9877/api/put \
-  -d '{"peer":"machine-a","local_path":"/tmp/file.txt","remote_path":"/"}'
-
-# Stream a file directly
-curl 'http://localhost:9877/api/receive?peer=machine-a&path=/file.txt' > file.txt
+# Execute command on remote machine
+curl -X POST http://localhost:9877/api/remote/exec \
+  -d '{"code":"warp-429-delta","command":"uname -a"}'
 ```
-
-### GUI
-
-Build and run the cross-platform desktop app:
-
-```bash
-go build -o ztransfer-gui ./cmd/ztransfer-gui/
-./ztransfer-gui
-```
-
-Features tabbed interface with Server, Transfer, Peers, and Settings views. Supports dark and light themes.
-
-## Architecture
-
-```
-┌──────────────┐     TLS 1.3 + ML-DSA-65      ┌──────────────┐
-│  Machine A   │◄──────────────────────────────►│  Machine B   │
-│  (server)    │   Signed request/response      │  (client)    │
-│              │                                │              │
-│  ztransfer   │                                │  ztransfer   │
-│  serve       │                                │  get/put/ls  │
-└──────┬───────┘                                └──────┬───────┘
-       │                                               │
-       ▼                                               ▼
-  libquantum_vault.a                            libquantum_vault.a
-  (Zig FFI: ML-DSA-65)                         (Zig FFI: ML-DSA-65)
-```
-
-### Security Model
-
-1. **Identity**: Each machine generates an ML-DSA-65 keypair on first run (`~/.ztransfer/identity.json`)
-2. **Pairing**: One-time token exchange validates both parties, stores public keys (`~/.ztransfer/known_peers.json`)
-3. **Authentication**: Every request is signed with ML-DSA-65 and verified by the server
-4. **Transport**: TLS 1.3 encrypts all traffic (self-signed certs — trust comes from ML-DSA, not PKI)
-5. **API security**: REST API binds to localhost only — no network exposure
-
-### Project Structure
-
-```
-ztransfer-public/
-├── cmd/
-│   ├── ztransfer/          # CLI binary
-│   └── ztransfer-gui/      # Fyne desktop app
-├── pkg/
-│   ├── api/                # Local REST API server
-│   ├── auth/               # Identity, pairing, peer management, TLS
-│   ├── client/             # HTTP client with ML-DSA auth
-│   ├── crypto/             # CGo bindings to Zig quantum vault
-│   └── server/             # HTTPS file server with auth middleware
-├── libs/
-│   ├── include/            # C header for Zig library
-│   └── lib/                # Prebuilt static libraries per platform
-├── claude-plugin/          # Claude Code plugin for AI-assisted transfers
-├── build.sh                # Cross-platform build script
-└── Makefile
-```
-
-## Building the Zig Library
-
-The `libquantum_vault.a` static library provides ML-DSA-65 and ML-KEM-768 via Zig. Prebuilt binaries are included for darwin-arm64. To build for other platforms from the [quantum-zig-forge](https://github.com/quantum-encoding/quantum-zig-forge) source:
-
-```bash
-cd quantum-zig-forge/quantum-vault
-zig build -Doptimize=ReleaseFast
-# Output: zig-out/lib/libquantum_vault.a
-```
-
-Copy the built library to `libs/lib/<os>-<arch>/libquantum_vault.a`.
-
-## Claude Code Plugin
-
-A Claude Code plugin is included at `claude-plugin/`. Install it locally:
-
-```json
-// Add to ~/.claude/settings.json under "enabledPlugins":
-{
-  "/path/to/ztransfer-public/claude-plugin": true
-}
-```
-
-This gives Claude Code the `/ztransfer` command and auto-triggers on file transfer requests.
 
 ## Commands
 
-| Command | Description |
-|---------|-------------|
-| `serve` | Start file server (share a directory) |
-| `api` | Start local REST API for programmatic access |
-| `pair` | Pair with a remote server (one-time) |
-| `ls` | List files on a paired peer |
-| `get` | Download a file from a peer |
-| `put` | Upload a file to a peer |
-| `peers` | List all paired peers |
-| `status` | Check a server's status |
-| `version` | Show version info |
+```
+ztransfer serve [--dir DIR] [--port PORT]     Start file server
+ztransfer pair ADDRESS --token TOKEN          Pair with a server (one-time)
+ztransfer ls PEER:/path/                      List remote files
+ztransfer get PEER:/path/file [LOCAL_DIR]     Download file
+ztransfer put LOCAL_FILE PEER:/path/          Upload file
+ztransfer peers                               List paired peers
+ztransfer status ADDRESS                      Check server status
+ztransfer remote host [--port PORT]           Host a remote session
+ztransfer remote shell CODE                   Interactive shell
+ztransfer remote exec CODE COMMAND            Run command remotely
+ztransfer api [--port PORT]                   Start REST API
+ztransfer version                             Show version
+```
+
+## How It Works
+
+### File Transfer
+1. Server generates a one-time pairing token
+2. Client pairs by exchanging ML-DSA-65 public keys
+3. All subsequent requests are signed and verified
+4. Files transferred over HTTPS/TLS 1.3
+
+### Remote Access
+1. Host generates a warp code (e.g., `warp-429-delta`)
+2. Both peers discover public endpoints via STUN
+3. UDP hole punching establishes a direct tunnel
+4. Tunnel encrypted with AES-256-GCM (key derived from warp code)
+5. PTY shell or command exec multiplexed over the tunnel
+
+## Building
+
+```bash
+go build ./cmd/ztransfer/
+```
+
+Requires CGO for the post-quantum crypto library. Prebuilt static libraries are included for:
+- `darwin-arm64` (Apple Silicon Mac)
+- `darwin-amd64` (Intel Mac)
+- `linux-amd64` (x86_64 Linux)
+- `linux-arm64` (ARM64 Linux)
+
+## Project Structure
+
+```
+cmd/ztransfer/       CLI binary
+cmd/ztransfer-gui/   Desktop GUI (Fyne)
+pkg/auth/            Identity, pairing, peer store, TLS
+pkg/crypto/          Post-quantum crypto FFI (ML-DSA-65)
+pkg/server/          HTTPS file server
+pkg/client/          File transfer client
+pkg/api/             REST API + remote control endpoints
+pkg/nat/             STUN, UDP hole punching, warp codes
+pkg/remote/          PTY shell, exec, session management
+libs/                Prebuilt quantum_vault static libraries
+```
 
 ## License
 
-MIT - See [LICENSE](LICENSE)
-
-## Author
-
-Quantum Encoding Ltd
+MIT

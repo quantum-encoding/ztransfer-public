@@ -11,6 +11,7 @@ import (
 	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
 	"github.com/quantum-encoding/ztransfer-public/pkg/client"
 	"github.com/quantum-encoding/ztransfer-public/pkg/crypto"
+	"github.com/quantum-encoding/ztransfer-public/pkg/remote"
 	"github.com/quantum-encoding/ztransfer-public/pkg/server"
 )
 
@@ -39,6 +40,8 @@ func main() {
 		cmdPeers()
 	case "status":
 		cmdStatus(os.Args[2:])
+	case "remote":
+		cmdRemote(os.Args[2:])
 	case "version":
 		fmt.Printf("ztransfer %s (quantum vault %s)\n", version, crypto.Version())
 	case "help", "--help", "-h":
@@ -51,7 +54,7 @@ func main() {
 }
 
 func printUsage() {
-	fmt.Printf(`ztransfer %s — Secure LAN file transfer with post-quantum authentication
+	fmt.Printf(`ztransfer %s — Secure file transfer & remote access with post-quantum authentication
 
 Usage:
   ztransfer serve [--dir DIR] [--port PORT] [--name NAME]
@@ -62,6 +65,10 @@ Usage:
   ztransfer put LOCAL_FILE PEER:/path/
   ztransfer peers
   ztransfer status ADDRESS
+  ztransfer remote host [--port PORT]
+  ztransfer remote connect CODE [--host ADDRESS]
+  ztransfer remote shell CODE [--host ADDRESS]
+  ztransfer remote exec CODE COMMAND [ARGS...]
   ztransfer version
 
 Commands:
@@ -75,12 +82,19 @@ Commands:
   status    Check a server's status (no auth required)
   version   Show version info
 
+Remote Access:
+  remote host       Host a remote session (prints warp code for connector)
+  remote connect    Connect to a hosted session
+  remote shell      Open interactive shell on remote machine
+  remote exec       Run a single command on remote machine
+
 API Mode (for Claude Code):
   ztransfer api --port 9877
   curl http://localhost:9877/api/peers
   curl http://localhost:9877/api/ls?peer=NAME&path=/
   curl -X POST http://localhost:9877/api/get -d '{"peer":"NAME","remote_path":"/file","local_path":"/tmp/"}'
   curl 'http://localhost:9877/api/receive?peer=NAME&path=/file' > file
+  curl -X POST http://localhost:9877/api/remote/exec -d '{"code":"warp-429-delta","command":"pacman -S brave-bin"}'
 `, version)
 }
 
@@ -342,6 +356,108 @@ func cmdStatus(args []string) {
 	fmt.Printf("  Fingerprint: %s\n", status["fingerprint"])
 	fmt.Printf("  Version: %s\n", status["version"])
 	fmt.Printf("  Root: %s\n", status["root_dir"])
+}
+
+func cmdRemote(args []string) {
+	if len(args) < 1 {
+		fmt.Fprintf(os.Stderr, `Usage:
+  ztransfer remote host [--port PORT]        Host a session (prints warp code)
+  ztransfer remote connect CODE [--host ADDR] Connect to a hosted session
+  ztransfer remote shell CODE [--host ADDR]   Interactive shell on remote
+  ztransfer remote exec CODE COMMAND [ARGS]   Run command on remote
+`)
+		os.Exit(1)
+	}
+
+	identity, err := auth.LoadOrCreateIdentity(hostname())
+	if err != nil {
+		fatal("identity: %v", err)
+	}
+
+	switch args[0] {
+	case "host":
+		port := 9878
+		if p := getFlag(args, "--port", ""); p != "" {
+			fmt.Sscanf(p, "%d", &port)
+		}
+		session, err := remote.HostSession(identity, port)
+		if err != nil {
+			fatal("host: %v", err)
+		}
+		defer session.Close()
+
+		fmt.Printf("\n  Remote session active\n")
+		fmt.Printf("  Warp code: %s\n", session.WarpCode)
+		fmt.Printf("  Waiting for connections...\n\n")
+
+		// Serve incoming requests (blocks)
+		if err := remote.ServeShell(session.Tunnel); err != nil {
+			fatal("shell server: %v", err)
+		}
+
+	case "connect":
+		if len(args) < 2 {
+			fatal("usage: ztransfer remote connect CODE [--host ADDRESS]")
+		}
+		code := args[1]
+		hostAddr := getFlag(args, "--host", "")
+
+		session, err := remote.ConnectSession(identity, code, hostAddr)
+		if err != nil {
+			fatal("connect: %v", err)
+		}
+		defer session.Close()
+		fmt.Printf("  Connected to %s\n", session.PeerName)
+
+	case "shell":
+		if len(args) < 2 {
+			fatal("usage: ztransfer remote shell CODE [--host ADDRESS]")
+		}
+		code := args[1]
+		hostAddr := getFlag(args, "--host", "")
+
+		session, err := remote.ConnectSession(identity, code, hostAddr)
+		if err != nil {
+			fatal("connect: %v", err)
+		}
+		defer session.Close()
+
+		fmt.Printf("  Connected — opening shell...\n\n")
+		if err := remote.ConnectShell(session.Tunnel); err != nil {
+			fatal("shell: %v", err)
+		}
+
+	case "exec":
+		if len(args) < 3 {
+			fatal("usage: ztransfer remote exec CODE COMMAND [ARGS...]")
+		}
+		code := args[1]
+		command := args[2]
+		cmdArgs := args[3:]
+		hostAddr := getFlag(args, "--host", "")
+
+		session, err := remote.ConnectSession(identity, code, hostAddr)
+		if err != nil {
+			fatal("connect: %v", err)
+		}
+		defer session.Close()
+
+		resp, err := session.Exec(command, cmdArgs...)
+		if err != nil {
+			fatal("exec: %v", err)
+		}
+
+		if resp.Stdout != "" {
+			fmt.Print(resp.Stdout)
+		}
+		if resp.Stderr != "" {
+			fmt.Fprint(os.Stderr, resp.Stderr)
+		}
+		os.Exit(resp.ExitCode)
+
+	default:
+		fatal("unknown remote command: %s", args[0])
+	}
 }
 
 func mustClient() *client.Client {

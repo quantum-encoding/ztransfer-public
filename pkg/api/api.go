@@ -87,6 +87,9 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/receive", s.handleReceive)
 	mux.HandleFunc("/api/help", s.handleHelp)
 
+	// Remote access endpoints
+	s.RegisterRemoteRoutes(mux)
+
 	// Health check
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
