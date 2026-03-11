@@ -1,0 +1,8 @@
+/ztransfer
+/ztransfer-linux
+/ztransfer-gui
+libztransfer.a
+libztransfer.h
+dist/
+*.dylib
+.DS_Store
