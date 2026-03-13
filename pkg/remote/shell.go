@@ -11,7 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/nat"
+	"github.com/quantum-encoding/ztransfer/pkg/nat"
 	"golang.org/x/sys/unix"
 )
 

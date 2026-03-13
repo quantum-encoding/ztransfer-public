@@ -1,4 +1,4 @@
-module github.com/quantum-encoding/ztransfer-public
+module github.com/quantum-encoding/ztransfer
 
 go 1.26.1
 

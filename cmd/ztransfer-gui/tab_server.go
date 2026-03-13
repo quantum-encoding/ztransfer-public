@@ -14,8 +14,8 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
-	"github.com/quantum-encoding/ztransfer-public/pkg/server"
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
+	"github.com/quantum-encoding/ztransfer/pkg/server"
 )
 
 // BuildServerTab creates the server control interface.
@@ -30,6 +30,7 @@ func (c *Controller) BuildServerTab(w fyne.Window) fyne.CanvasObject {
 			c.serverDir = uri.Path()
 			dirLabel.SetText(c.serverDir)
 		}, w)
+		fd.Resize(fyne.NewSize(800, 560))
 		fd.Show()
 	})
 
@@ -95,12 +96,35 @@ func (c *Controller) BuildServerTab(w fyne.Window) fyne.CanvasObject {
 
 			tokenLabel.SetText(token)
 
-			srv := &server.Server{
-				RootDir:   c.serverDir,
-				Identity:  c.identity,
-				PeerStore: c.peerStore,
-				PairToken: token,
-				Port:      c.serverPort,
+			// Try the configured port, auto-retry up to 10 ports if in use
+			port := c.serverPort
+			var srv *server.Server
+			for attempt := 0; attempt < 10; attempt++ {
+				ln, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+				if err != nil {
+					appendLog(fmt.Sprintf("Port %d in use, trying %d...", port, port+1))
+					port++
+					continue
+				}
+				ln.Close()
+				srv = &server.Server{
+					RootDir:   c.serverDir,
+					Identity:  c.identity,
+					PeerStore: c.peerStore,
+					PairToken: token,
+					Port:      port,
+				}
+				break
+			}
+			if srv == nil {
+				appendLog(fmt.Sprintf("Could not find a free port (%d-%d)", c.serverPort, port-1))
+				return
+			}
+
+			if port != c.serverPort {
+				appendLog(fmt.Sprintf("Using port %d (original %d was busy)", port, c.serverPort))
+				portEntry.SetText(fmt.Sprintf("%d", port))
+				c.serverPort = port
 			}
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -112,20 +136,22 @@ func (c *Controller) BuildServerTab(w fyne.Window) fyne.CanvasObject {
 			// Get local addresses
 			addrs := localAddresses()
 			if len(addrs) > 0 {
-				addressLabel.SetText(fmt.Sprintf("https://%s:%d", addrs[0], c.serverPort))
-				pairCommandLabel.SetText(fmt.Sprintf("ztransfer pair %s:%d --token %s", addrs[0], c.serverPort, token))
+				addressLabel.SetText(fmt.Sprintf("https://%s:%d", addrs[0], port))
+				pairCommandLabel.SetText(fmt.Sprintf("ztransfer pair %s:%d --token %s", addrs[0], port, token))
 			}
 
 			toggleButton.SetText("Stop Server")
 			toggleButton.SetIcon(theme.MediaStopIcon())
-			c.SetStatus(fmt.Sprintf("Serving %s on port %d", c.serverDir, c.serverPort))
-			appendLog(fmt.Sprintf("Server started — serving %s", c.serverDir))
+			c.SetStatus(fmt.Sprintf("Serving %s on port %d", c.serverDir, port))
+			appendLog(fmt.Sprintf("Server started — serving %s on port %d", c.serverDir, port))
 			appendLog(fmt.Sprintf("Pair token: %s", token))
 
 			go func() {
 				err := srv.Start()
 				if ctx.Err() == nil && err != nil {
-					appendLog("Server error: " + err.Error())
+					fyne.Do(func() {
+						appendLog("Server error: " + err.Error())
+					})
 				}
 			}()
 

@@ -1,0 +1,9 @@
+[Details]
+  Icon = ""
+  Name = "ztransfer"
+  ID = "com.quantumencoding.ztransfer"
+  Version = "0.2.0"
+  Build = 1
+
+[Migrations]
+  fyneDo = true

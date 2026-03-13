@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
-	"github.com/quantum-encoding/ztransfer-public/pkg/crypto"
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
+	"github.com/quantum-encoding/ztransfer/pkg/crypto"
 )
 
 // FileInfo represents a file or directory entry.

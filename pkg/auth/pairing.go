@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/crypto"
+	"github.com/quantum-encoding/ztransfer/pkg/crypto"
 )
 
 const tokenLength = 6

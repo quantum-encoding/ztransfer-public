@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/crypto"
+	"github.com/quantum-encoding/ztransfer/pkg/crypto"
 )
 
 // Peer represents a trusted remote machine.

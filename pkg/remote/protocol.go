@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/nat"
+	"github.com/quantum-encoding/ztransfer/pkg/nat"
 )
 
 // Message types for the shell protocol.
@@ -21,6 +21,13 @@ const (
 	MsgExecResp byte = 0x11
 	MsgPing     byte = 0x20
 	MsgPong     byte = 0x21
+
+	// Computer use messages (0x30–0x3F)
+	MsgScreenReq  byte = 0x30 // Request a screenshot from remote
+	MsgScreenResp byte = 0x31 // PNG screenshot data
+	MsgInputReq   byte = 0x32 // Mouse/keyboard action to execute
+	MsgInputResp  byte = 0x33 // Action result (success/error)
+	MsgScreenInfo byte = 0x34 // Display resolution and scale info
 )
 
 // ShellMessage is the wire format for shell data.

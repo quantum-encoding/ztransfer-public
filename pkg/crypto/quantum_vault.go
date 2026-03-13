@@ -4,6 +4,8 @@ package crypto
 #cgo CFLAGS: -I${SRCDIR}/../../libs/include
 #cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../libs/lib/darwin-arm64 -lquantum_vault
 #cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../libs/lib/linux-amd64 -lquantum_vault
+#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../../libs/lib/linux-arm64 -lquantum_vault
+#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../libs/lib/darwin-amd64 -lquantum_vault
 
 #include "quantum_vault.h"
 #include <string.h>

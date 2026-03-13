@@ -42,8 +42,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
-	"github.com/quantum-encoding/ztransfer-public/pkg/client"
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
+	"github.com/quantum-encoding/ztransfer/pkg/client"
 )
 
 // Server is the local API server for programmatic access.
@@ -89,6 +89,12 @@ func (s *Server) Start() error {
 
 	// Remote access endpoints
 	s.RegisterRemoteRoutes(mux)
+
+	// Computer use endpoints (screen capture, input injection)
+	s.RegisterComputerRoutes(mux)
+
+	// Web-based remote desktop viewer
+	s.RegisterViewerRoutes(mux)
 
 	// Health check
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

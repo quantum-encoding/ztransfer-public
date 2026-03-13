@@ -11,7 +11,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/crypto"
+	"github.com/quantum-encoding/ztransfer/pkg/crypto"
 )
 
 // BuildStatusBar creates the bottom status bar.
@@ -31,16 +31,19 @@ func (c *Controller) BuildStatusBar() fyne.CanvasObject {
 		for {
 			time.Sleep(500 * time.Millisecond)
 			status := c.GetStatus()
-			statusLabel.SetText(status)
-
-			if c.IsServerRunning() {
-				dot.FillColor = theme.SuccessColor()
-			} else if c.selectedPeer != "" {
-				dot.FillColor = theme.PrimaryColor()
-			} else {
-				dot.FillColor = theme.DisabledColor()
-			}
-			dot.Refresh()
+			running := c.IsServerRunning()
+			hasPeer := c.selectedPeer != ""
+			fyne.Do(func() {
+				statusLabel.SetText(status)
+				if running {
+					dot.FillColor = theme.SuccessColor()
+				} else if hasPeer {
+					dot.FillColor = theme.PrimaryColor()
+				} else {
+					dot.FillColor = theme.DisabledColor()
+				}
+				dot.Refresh()
+			})
 		}
 	}()
 

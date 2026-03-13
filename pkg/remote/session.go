@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"os"
+	"os/exec"
+	"strings"
 	"time"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
-	"github.com/quantum-encoding/ztransfer-public/pkg/nat"
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
+	"github.com/quantum-encoding/ztransfer/pkg/nat"
 )
 
 // Session represents an active remote connection between two peers.
@@ -21,33 +24,47 @@ type Session struct {
 	Identity    *auth.Identity
 }
 
-// HostSession starts hosting a remote session by listening for an incoming
-// connection on the specified port. It generates a warp code that the
-// connecting peer uses to establish the tunnel.
+// HostSession starts hosting a remote session. If relay is configured (via
+// ZTRANSFER_RELAY_URL env var), the session is hosted through the relay.
+// Otherwise, it listens on a local TCP port.
 func HostSession(identity *auth.Identity, port int) (*Session, error) {
 	code, err := nat.GenerateWarpCode()
 	if err != nil {
 		return nil, fmt.Errorf("host session: generate warp code: %w", err)
 	}
 
-	addr := fmt.Sprintf(":%d", port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return nil, fmt.Errorf("host session: listen on %s: %w", addr, err)
-	}
+	var tunnel *nat.Tunnel
 
-	fmt.Printf("Session hosted on port %d\n", port)
-	fmt.Printf("Warp code: %s\n", code.String())
-	fmt.Printf("Waiting for peer to connect...\n")
+	relayCfg := relayConfigFromEnv()
+	if relayCfg != nil {
+		fmt.Printf("Hosting via relay: %s\n", relayCfg.URL)
+		fmt.Printf("Warp code: %s\n", code.String())
+		fmt.Printf("Waiting for peer to connect...\n")
 
-	conn, err := listener.Accept()
-	if err != nil {
+		tunnel, err = nat.HostViaRelay(relayCfg, code)
+		if err != nil {
+			return nil, fmt.Errorf("host session: relay: %w", err)
+		}
+	} else {
+		addr := fmt.Sprintf(":%d", port)
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			return nil, fmt.Errorf("host session: listen on %s: %w", addr, err)
+		}
+
+		fmt.Printf("Session hosted on port %d\n", port)
+		fmt.Printf("Warp code: %s\n", code.String())
+		fmt.Printf("Waiting for peer to connect...\n")
+
+		conn, err := listener.Accept()
+		if err != nil {
+			listener.Close()
+			return nil, fmt.Errorf("host session: accept: %w", err)
+		}
 		listener.Close()
-		return nil, fmt.Errorf("host session: accept: %w", err)
-	}
-	listener.Close()
 
-	tunnel := nat.NewTunnel(conn)
+		tunnel = nat.NewTunnel(conn)
+	}
 
 	// Exchange identity information with the peer.
 	localInfo := peerInfo{
@@ -87,19 +104,30 @@ func HostSession(identity *auth.Identity, port int) (*Session, error) {
 }
 
 // ConnectSession connects to a hosted session using a warp code.
-// The hostAddr should be in "host:port" format.
+// If relay is configured (ZTRANSFER_RELAY_URL), connects through the relay.
+// Otherwise hostAddr should be in "host:port" format for direct connection.
 func ConnectSession(identity *auth.Identity, code string, hostAddr string) (*Session, error) {
 	warpCode, err := nat.ParseWarpCode(code)
 	if err != nil {
 		return nil, fmt.Errorf("connect session: %w", err)
 	}
 
-	conn, err := net.DialTimeout("tcp", hostAddr, 30*time.Second)
-	if err != nil {
-		return nil, fmt.Errorf("connect session: dial %s: %w", hostAddr, err)
-	}
+	var tunnel *nat.Tunnel
 
-	tunnel := nat.NewTunnel(conn)
+	relayCfg := relayConfigFromEnv()
+	if relayCfg != nil {
+		fmt.Printf("Connecting via relay: %s\n", relayCfg.URL)
+		tunnel, err = nat.ConnectViaRelay(relayCfg, warpCode)
+		if err != nil {
+			return nil, fmt.Errorf("connect session: relay: %w", err)
+		}
+	} else {
+		conn, err := net.DialTimeout("tcp", hostAddr, 30*time.Second)
+		if err != nil {
+			return nil, fmt.Errorf("connect session: dial %s: %w", hostAddr, err)
+		}
+		tunnel = nat.NewTunnel(conn)
+	}
 
 	// Receive the host's identity.
 	peerData, err := tunnel.Recv()
@@ -166,4 +194,41 @@ func (s *Session) Close() error {
 type peerInfo struct {
 	Name        string `json:"name"`
 	Fingerprint string `json:"fingerprint"`
+}
+
+// relayConfigFromEnv builds a RelayConfig. Uses ZTRANSFER_RELAY_URL env var
+// if set, otherwise defaults to the production relay. Set ZTRANSFER_RELAY=off
+// to disable relay entirely and use direct connections only.
+func relayConfigFromEnv() *nat.RelayConfig {
+	// Allow explicitly disabling relay.
+	if strings.EqualFold(os.Getenv("ZTRANSFER_RELAY"), "off") {
+		return nil
+	}
+
+	url := os.Getenv("ZTRANSFER_RELAY_URL")
+	if url == "" {
+		url = nat.DefaultRelayURL
+	}
+
+	token := os.Getenv("ZTRANSFER_RELAY_TOKEN")
+	if token == "" {
+		token = fetchGCloudToken(url)
+	}
+
+	return &nat.RelayConfig{
+		URL:       url,
+		AuthToken: token,
+	}
+}
+
+// fetchGCloudToken tries to get a GCP identity token via gcloud CLI.
+// Returns empty string if gcloud is not installed or fails.
+func fetchGCloudToken(audience string) string {
+	cmd := exec.Command("gcloud", "auth", "print-identity-token",
+		"--audiences="+audience)
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
 }

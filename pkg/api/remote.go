@@ -18,8 +18,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/nat"
-	"github.com/quantum-encoding/ztransfer-public/pkg/remote"
+	"github.com/quantum-encoding/ztransfer/pkg/nat"
+	"github.com/quantum-encoding/ztransfer/pkg/remote"
 )
 
 // activeSessions tracks active remote sessions for the API.

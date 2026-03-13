@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/nat"
+	"github.com/quantum-encoding/ztransfer/pkg/nat"
 )
 
 // ExecRequest represents a command to execute remotely.

@@ -7,7 +7,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/crypto"
+	"github.com/quantum-encoding/ztransfer/pkg/crypto"
 )
 
 // BuildSettingsTab creates the settings interface.
@@ -74,9 +74,13 @@ func (c *Controller) BuildSettingsTab(a fyne.App) fyne.CanvasObject {
 		),
 	)
 
-	return container.NewVBox(
-		prefsSection,
-		identitySection,
-		aboutSection,
+	settingsPanels := container.NewAppTabs(
+		container.NewTabItem("Preferences", container.NewVBox(prefsSection)),
+		container.NewTabItem("Identity", container.NewVBox(identitySection)),
+		container.NewTabItem("About", container.NewVBox(aboutSection)),
+		container.NewTabItem("Guide", c.BuildGuideTab()),
 	)
+	settingsPanels.SetTabLocation(container.TabLocationTop)
+
+	return settingsPanels
 }

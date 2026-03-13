@@ -2,20 +2,24 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
+	"time"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/api"
-	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
-	"github.com/quantum-encoding/ztransfer-public/pkg/client"
-	"github.com/quantum-encoding/ztransfer-public/pkg/crypto"
-	"github.com/quantum-encoding/ztransfer-public/pkg/remote"
-	"github.com/quantum-encoding/ztransfer-public/pkg/server"
+	"github.com/quantum-encoding/ztransfer/pkg/api"
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
+	"github.com/quantum-encoding/ztransfer/pkg/client"
+	"github.com/quantum-encoding/ztransfer/pkg/crypto"
+	"github.com/quantum-encoding/ztransfer/pkg/nat"
+	"github.com/quantum-encoding/ztransfer/pkg/remote"
+	"github.com/quantum-encoding/ztransfer/pkg/server"
 )
 
-const version = "0.1.0"
+const version = "0.2.0"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -79,7 +83,7 @@ Commands:
   get       Download a file from a paired peer
   put       Upload a file to a paired peer
   peers     List paired peers
-  status    Check a server's status (no auth required)
+  status    Show local status + relay health, or check a remote server
   version   Show version info
 
 Remote Access:
@@ -338,7 +342,66 @@ func cmdAPI(args []string) {
 
 func cmdStatus(args []string) {
 	if len(args) < 1 {
-		fatal("usage: ztransfer status ADDRESS")
+		// No address given — show local status including relay
+		identity, err := auth.LoadOrCreateIdentity(hostname())
+		if err != nil {
+			fatal("identity: %v", err)
+		}
+		peerStore, err := auth.LoadPeerStore()
+		if err != nil {
+			fatal("peer store: %v", err)
+		}
+
+		fmt.Printf("\n  ztransfer %s\n", version)
+		fmt.Printf("  %-14s %s\n", "Identity:", identity.Name)
+		fmt.Printf("  %-14s %s\n", "Fingerprint:", identity.Fingerprint())
+		fmt.Printf("  %-14s %d paired\n", "Peers:", len(peerStore.ListPeers()))
+
+		// Relay status
+		relayURL := os.Getenv("ZTRANSFER_RELAY_URL")
+		if relayURL == "" {
+			relayURL = nat.DefaultRelayURL
+		}
+		relayDisabled := strings.EqualFold(os.Getenv("ZTRANSFER_RELAY"), "off")
+
+		fmt.Println()
+		fmt.Printf("  Relay:\n")
+		if relayDisabled {
+			fmt.Printf("    %-12s disabled (ZTRANSFER_RELAY=off)\n", "Status:")
+		} else {
+			fmt.Printf("    %-12s %s\n", "URL:", relayURL)
+
+			// Check relay health
+			httpClient := &http.Client{Timeout: 5 * time.Second}
+			resp, err := httpClient.Get(relayURL + "/health")
+			if err != nil {
+				fmt.Printf("    %-12s unreachable (%v)\n", "Health:", err)
+			} else {
+				resp.Body.Close()
+				if resp.StatusCode == 200 {
+					fmt.Printf("    %-12s ok\n", "Health:")
+				} else {
+					fmt.Printf("    %-12s %s\n", "Health:", resp.Status)
+				}
+			}
+
+			// Check token
+			token := os.Getenv("ZTRANSFER_RELAY_TOKEN")
+			if token != "" {
+				fmt.Printf("    %-12s from ZTRANSFER_RELAY_TOKEN\n", "Auth:")
+			} else {
+				// Try gcloud
+				cmd := exec.Command("gcloud", "auth", "print-identity-token",
+					"--audiences="+relayURL)
+				if out, err := cmd.Output(); err == nil && len(strings.TrimSpace(string(out))) > 0 {
+					fmt.Printf("    %-12s gcloud identity token\n", "Auth:")
+				} else {
+					fmt.Printf("    %-12s none (set ZTRANSFER_RELAY_TOKEN or install gcloud)\n", "Auth:")
+				}
+			}
+		}
+		fmt.Println()
+		return
 	}
 
 	address := args[0]

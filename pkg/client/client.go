@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
-	"github.com/quantum-encoding/ztransfer-public/pkg/server"
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
+	"github.com/quantum-encoding/ztransfer/pkg/server"
 )
 
 // Client is the ztransfer file transfer client.

@@ -10,7 +10,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/auth"
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
 )
 
 // BuildPeersTab creates the peer management interface.
@@ -77,14 +77,16 @@ func (c *Controller) BuildPeersTab() fyne.CanvasObject {
 		pairStatus.SetText("Pairing...")
 		go func() {
 			err := auth.RequestPair(addr, token, c.identity, c.peerStore)
-			if err != nil {
-				pairStatus.SetText("Failed: " + err.Error())
-			} else {
-				pairStatus.SetText("Paired successfully!")
-				peerList.Refresh()
-				addrEntry.SetText("")
-				tokenEntry.SetText("")
-			}
+			fyne.Do(func() {
+				if err != nil {
+					pairStatus.SetText("Failed: " + err.Error())
+				} else {
+					pairStatus.SetText("Paired successfully!")
+					peerList.Refresh()
+					addrEntry.SetText("")
+					tokenEntry.SetText("")
+				}
+			})
 		}()
 	})
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -12,8 +13,48 @@ import (
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
-	"github.com/quantum-encoding/ztransfer-public/pkg/server"
+	"github.com/quantum-encoding/ztransfer/pkg/server"
 )
+
+// uploadFile uploads a local file to the selected peer, updating the provided UI elements.
+func (c *Controller) uploadFile(
+	localPath, remotePath string,
+	progressBar *widget.ProgressBar,
+	progressLabel *widget.Label,
+	cancelButton *widget.Button,
+	fileStatus *widget.Label,
+	transferCancel *func(),
+	refreshFiles func(),
+) {
+	progressBar.Show()
+	progressBar.SetValue(0)
+	progressLabel.Show()
+	cancelButton.Show()
+	progressLabel.SetText(fmt.Sprintf("Uploading %s...", filepath.Base(localPath)))
+	c.SetStatus(fmt.Sprintf("Uploading %s", filepath.Base(localPath)))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	*transferCancel = cancel
+
+	go func() {
+		written, err := c.client.Upload(c.selectedPeer, localPath, remotePath)
+		_ = ctx
+		fyne.Do(func() {
+			cancelButton.Hide()
+			progressBar.SetValue(1.0)
+			if err != nil {
+				fileStatus.SetText("Upload error: " + err.Error())
+				c.SetStatus("Upload failed")
+			} else {
+				fileStatus.SetText(fmt.Sprintf("Uploaded %s (%s)", filepath.Base(localPath), formatBytes(written)))
+				c.SetStatus("Upload complete")
+				if refreshFiles != nil {
+					refreshFiles()
+				}
+			}
+		})
+	}()
+}
 
 // BuildTransferTab creates the main file transfer interface.
 func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
@@ -47,19 +88,21 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 
 	pathLabel := widget.NewLabelWithStyle("/", fyne.TextAlignLeading, fyne.TextStyle{Monospace: true})
 
-	fileList := widget.NewList(
+	var fileList *widget.List
+	fileList = widget.NewList(
 		func() int {
 			filesMu.Lock()
 			defer filesMu.Unlock()
 			return len(files)
 		},
 		func() fyne.CanvasObject {
-			return container.NewHBox(
+			inner := container.NewHBox(
 				widget.NewIcon(theme.FileIcon()),
 				widget.NewLabel("filename.txt"),
 				layout.NewSpacer(),
 				widget.NewLabel("0 B"),
 			)
+			return newRightClickable(inner, nil)
 		},
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 			filesMu.Lock()
@@ -70,7 +113,8 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 			f := files[id]
 			filesMu.Unlock()
 
-			box := obj.(*fyne.Container)
+			rc := obj.(*rightClickable)
+			box := rc.child.(*fyne.Container)
 			icon := box.Objects[0].(*widget.Icon)
 			nameLabel := box.Objects[1].(*widget.Label)
 			sizeLabel := box.Objects[3].(*widget.Label)
@@ -84,14 +128,44 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 				nameLabel.SetText(f.Name)
 				sizeLabel.SetText(formatBytes(f.Size))
 			}
+
+			rc.onRightTap = func(_ fyne.Position, abs fyne.Position) {
+				items := []*fyne.MenuItem{
+					fyne.NewMenuItem("Copy Name", func() {
+						w.Clipboard().SetContent(f.Name)
+					}),
+					fyne.NewMenuItem("Copy Path", func() {
+						w.Clipboard().SetContent(f.Path)
+					}),
+				}
+				if !f.IsDir {
+					items = append(items, fyne.NewMenuItem("Download", func() {
+						fileList.Select(id)
+					}))
+				}
+				menu := fyne.NewMenu("", items...)
+				widget.ShowPopUpMenuAtPosition(menu, w.Canvas(), abs)
+			}
 		},
 	)
 
-	// Progress bar
+	// Progress bar + cancel
 	progressBar := widget.NewProgressBar()
 	progressBar.Hide()
 	progressLabel := widget.NewLabel("")
 	progressLabel.Hide()
+
+	var transferCancel func()
+	cancelButton := widget.NewButtonWithIcon("Cancel", theme.CancelIcon(), func() {
+		if transferCancel != nil {
+			transferCancel()
+			transferCancel = nil
+		}
+		progressBar.Hide()
+		progressLabel.Hide()
+	})
+	cancelButton.Hide()
+	cancelButton.Importance = widget.DangerImportance
 
 	// Status label for file operations
 	fileStatus := widget.NewLabel("")
@@ -104,17 +178,21 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 		c.SetStatus(fmt.Sprintf("Loading %s:%s...", c.selectedPeer, currentPath))
 		go func() {
 			result, err := c.client.List(c.selectedPeer, currentPath)
-			if err != nil {
-				fileStatus.SetText("Error: " + err.Error())
-				c.SetStatus("Error listing files")
-				return
-			}
 			filesMu.Lock()
-			files = result
+			if err == nil {
+				files = result
+			}
 			filesMu.Unlock()
-			pathLabel.SetText(currentPath)
-			fileList.Refresh()
-			c.SetStatus(fmt.Sprintf("Connected to %s", c.selectedPeer))
+			fyne.Do(func() {
+				if err != nil {
+					fileStatus.SetText("Error: " + err.Error())
+					c.SetStatus("Error listing files")
+				} else {
+					pathLabel.SetText(currentPath)
+					fileList.Refresh()
+					c.SetStatus(fmt.Sprintf("Connected to %s", c.selectedPeer))
+				}
+			})
 		}()
 	}
 
@@ -182,21 +260,29 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 		progressBar.Show()
 		progressBar.SetValue(0)
 		progressLabel.Show()
+		cancelButton.Show()
 		progressLabel.SetText(fmt.Sprintf("Downloading %s...", f.Name))
 		c.SetStatus(fmt.Sprintf("Downloading %s", f.Name))
 
+		ctx, cancel := context.WithCancel(context.Background())
+		transferCancel = cancel
+
 		go func() {
 			written, err := c.client.Download(c.selectedPeer, f.Path, c.downloadDir)
-			progressBar.SetValue(1.0)
-			if err != nil {
-				fileStatus.SetText("Download error: " + err.Error())
-				progressLabel.SetText("Download failed")
-				c.SetStatus("Download failed")
-			} else {
-				fileStatus.SetText(fmt.Sprintf("Downloaded %s (%s)", f.Name, formatBytes(written)))
-				progressLabel.SetText(fmt.Sprintf("Downloaded %s to %s", f.Name, c.downloadDir))
-				c.SetStatus("Download complete")
-			}
+			_ = ctx // cancel support for future streaming downloads
+			fyne.Do(func() {
+				cancelButton.Hide()
+				progressBar.SetValue(1.0)
+				if err != nil {
+					fileStatus.SetText("Download error: " + err.Error())
+					progressLabel.SetText("Download failed")
+					c.SetStatus("Download failed")
+				} else {
+					fileStatus.SetText(fmt.Sprintf("Downloaded %s (%s)", f.Name, formatBytes(written)))
+					progressLabel.SetText(fmt.Sprintf("Downloaded %s to %s", f.Name, c.downloadDir))
+					c.SetStatus("Download complete")
+				}
+			})
 		}()
 	})
 
@@ -208,28 +294,29 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 			reader.Close()
 			localPath := reader.URI().Path()
 			remotePath := currentPath + filepath.Base(localPath)
-
-			progressBar.Show()
-			progressBar.SetValue(0)
-			progressLabel.Show()
-			progressLabel.SetText(fmt.Sprintf("Uploading %s...", filepath.Base(localPath)))
-			c.SetStatus(fmt.Sprintf("Uploading %s", filepath.Base(localPath)))
-
-			go func() {
-				written, err := c.client.Upload(c.selectedPeer, localPath, remotePath)
-				progressBar.SetValue(1.0)
-				if err != nil {
-					fileStatus.SetText("Upload error: " + err.Error())
-					c.SetStatus("Upload failed")
-				} else {
-					fileStatus.SetText(fmt.Sprintf("Uploaded %s (%s)", filepath.Base(localPath), formatBytes(written)))
-					c.SetStatus("Upload complete")
-					refreshFiles()
-				}
-			}()
+			c.uploadFile(localPath, remotePath, progressBar, progressLabel, cancelButton, fileStatus, &transferCancel, refreshFiles)
 		}, w)
+		fd.Resize(fyne.NewSize(800, 560))
 		fd.Show()
 	})
+
+	// Drop zone label
+	dropHint := widget.NewLabelWithStyle("Drop files here to upload", fyne.TextAlignCenter, fyne.TextStyle{Italic: true})
+
+	// Register drop handler on the controller so main.go can wire SetOnDropped
+	c.mu.Lock()
+	c.onDrop = func(uris []fyne.URI) {
+		if c.selectedPeer == "" {
+			fileStatus.SetText("Select a peer before dropping files")
+			return
+		}
+		for _, uri := range uris {
+			localPath := uri.Path()
+			remotePath := currentPath + filepath.Base(localPath)
+			c.uploadFile(localPath, remotePath, progressBar, progressLabel, cancelButton, fileStatus, &transferCancel, refreshFiles)
+		}
+	}
+	c.mu.Unlock()
 
 	// Download dir selector
 	downloadDirLabel := widget.NewLabelWithStyle(c.downloadDir, fyne.TextAlignLeading, fyne.TextStyle{Monospace: true})
@@ -241,6 +328,7 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 			c.downloadDir = uri.Path()
 			downloadDirLabel.SetText(c.downloadDir)
 		}, w)
+		fd.Resize(fyne.NewSize(800, 560))
 		fd.Show()
 	})
 
@@ -262,11 +350,14 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 		uploadButton,
 	)
 
-	progressSection := container.NewVBox(progressBar, progressLabel)
+	progressSection := container.NewVBox(
+		container.NewHBox(progressBar, cancelButton),
+		progressLabel,
+	)
 
 	rightPanel := container.NewBorder(
 		navBar,
-		container.NewVBox(actionBar, progressSection, fileStatus),
+		container.NewVBox(actionBar, progressSection, fileStatus, dropHint),
 		nil, nil,
 		fileList,
 	)
