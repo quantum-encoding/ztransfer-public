@@ -141,32 +141,22 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 	)
 
 	// === Layout ===
-	mintForm := container.NewVBox(
-		widget.NewLabelWithStyle("Mint Token", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	mintForm := panelWithTitle("Mint Token", container.NewVBox(
 		container.New(layout.NewFormLayout(),
 			widget.NewLabel("Scope:"), scopeSelect,
 			widget.NewLabel("Type:"), typeSelect,
 		),
 		container.NewHBox(mintBtn, copyBtn),
 		statusLabel,
-	)
+	))
 
-	tokenPanel := container.NewVBox(
-		widget.NewLabelWithStyle("Token", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
-		tokenOutput,
-	)
+	tokenPanel := panelWithTitle("Token", tokenOutput)
 
-	sourceInfo := container.NewVBox(
-		widget.NewLabelWithStyle("Token Source", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
-		container.New(layout.NewFormLayout(),
-			widget.NewLabel("Source:"), sourceLabel,
-			widget.NewLabel("Service Account:"), saLabel,
-			widget.NewLabel("Audience:"), audienceLabel,
-		),
-	)
+	sourceInfo := panelWithTitle("Token Source", container.New(layout.NewFormLayout(),
+		widget.NewLabel("Source:"), sourceLabel,
+		widget.NewLabel("Service Account:"), saLabel,
+		widget.NewLabel("Audience:"), audienceLabel,
+	))
 
 	leftPanel := container.NewVBox(
 		mintForm,
@@ -176,11 +166,7 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 		sourceInfo,
 	)
 
-	rightPanel := container.NewVBox(
-		widget.NewLabelWithStyle("Reference", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
-		scopeDesc,
-	)
+	rightPanel := panelWithTitle("Reference", scopeDesc)
 
 	split := container.NewHSplit(leftPanel, rightPanel)
 	split.SetOffset(0.6)

@@ -180,9 +180,7 @@ func (c *Controller) BuildAuditTab(w fyne.Window) fyne.CanvasObject {
 	openBtn.Importance = widget.HighImportance
 
 	// === Layout ===
-	summaryPanel := container.NewVBox(
-		widget.NewLabelWithStyle("Verification", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	summaryPanel := panelWithTitle("Verification", container.NewVBox(
 		verifyResult,
 		widget.NewSeparator(),
 		container.New(layout.NewFormLayout(),
@@ -193,7 +191,7 @@ func (c *Controller) BuildAuditTab(w fyne.Window) fyne.CanvasObject {
 			widget.NewLabel("Start:"), startLabel,
 			widget.NewLabel("End:"), endLabel,
 		),
-	)
+	))
 
 	topBar := container.NewHBox(
 		openBtn,
@@ -203,18 +201,10 @@ func (c *Controller) BuildAuditTab(w fyne.Window) fyne.CanvasObject {
 	)
 
 	// Event list panel
-	listPanel := container.NewBorder(
-		widget.NewLabelWithStyle("Events", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		nil, nil, nil,
-		eventList,
-	)
+	listPanel := panelWithTitle("Events", eventList)
 
 	// Detail panel
-	detailPanel := container.NewBorder(
-		widget.NewLabelWithStyle("Event Detail", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		nil, nil, nil,
-		container.NewVScroll(detailText),
-	)
+	detailPanel := panelWithTitle("Event Detail", container.NewVScroll(detailText))
 
 	// Left: event list, Right: summary + detail
 	bottomRight := container.NewVSplit(summaryPanel, detailPanel)

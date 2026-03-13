@@ -322,8 +322,6 @@ func (c *Controller) BuildFilesTab(w fyne.Window) fyne.CanvasObject {
 	})
 
 	// === Whitelist section ===
-	whitelistLabel := widget.NewLabelWithStyle("Discoverable Directories", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
-
 	var whitelistList *widget.List
 	whitelistList = widget.NewList(
 		func() int {
@@ -390,15 +388,11 @@ func (c *Controller) BuildFilesTab(w fyne.Window) fyne.CanvasObject {
 		addCurrentButton,
 	)
 
-	whitelistSection := container.NewBorder(
-		container.NewVBox(
-			widget.NewSeparator(),
-			whitelistLabel,
-			whitelistControls,
-		),
+	whitelistSection := panelWithTitle("Discoverable Directories", container.NewBorder(
+		whitelistControls,
 		nil, nil, nil,
 		whitelistList,
-	)
+	))
 
 	// Tree panel (top) + whitelist (bottom)
 	leftContent := container.NewBorder(

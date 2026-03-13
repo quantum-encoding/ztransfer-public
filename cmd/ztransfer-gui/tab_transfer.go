@@ -362,11 +362,7 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 		fileList,
 	)
 
-	peerPanel := container.NewBorder(
-		widget.NewLabelWithStyle("Peers", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		nil, nil, nil,
-		peerList,
-	)
+	peerPanel := panelWithTitle("Peers", peerList)
 
 	split := container.NewHSplit(peerPanel, rightPanel)
 	split.SetOffset(0.22)

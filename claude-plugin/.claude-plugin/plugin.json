@@ -1,10 +1,10 @@
 {
   "name": "ztransfer",
-  "version": "0.1.0",
-  "description": "Secure LAN file transfer between machines using post-quantum authentication. Enables Claude Code to send and receive files across paired peers via the ztransfer API.",
+  "version": "0.2.0",
+  "description": "Secure file transfer, remote execution, and computer use between machines using post-quantum authentication. Enables Claude Code to transfer files, run commands, and control remote screens via the ztransfer API.",
   "author": {
     "name": "Quantum Encoding Ltd"
   },
   "license": "MIT",
-  "keywords": ["file-transfer", "lan", "quantum", "ztransfer", "sync"]
+  "keywords": ["file-transfer", "remote-exec", "computer-use", "lan", "quantum", "ztransfer", "warp-code"]
 }

@@ -215,28 +215,22 @@ func (c *Controller) BuildRemoteTab(w fyne.Window) fyne.CanvasObject {
 	connectBtn.Importance = widget.HighImportance
 
 	// === Layout ===
-	connectionForm := container.NewVBox(
-		widget.NewLabelWithStyle("Remote Connection", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	connectionForm := panelWithTitle("Remote Connection", container.NewVBox(
 		container.New(layout.NewFormLayout(),
 			widget.NewLabel("Warp Code:"), codeEntry,
 			widget.NewLabel("Mode:"), modeSelect,
 		),
 		container.NewHBox(connectBtn, disconnectBtn, layout.NewSpacer(),
 			container.NewWithoutLayout(statusDot), statusLabel),
-	)
+	))
 
-	sessionInfo := container.NewVBox(
-		widget.NewLabelWithStyle("Session", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
-		container.New(layout.NewFormLayout(),
-			widget.NewLabel("Peer:"), peerLabel,
-			widget.NewLabel("Duration:"), durationLabel,
-			widget.NewLabel("Resolution:"), resLabel,
-			widget.NewLabel("Frame Rate:"), fpsLabel,
-			widget.NewLabel("Transfer:"), sizeLabel,
-		),
-	)
+	sessionInfo := panelWithTitle("Session", container.New(layout.NewFormLayout(),
+		widget.NewLabel("Peer:"), peerLabel,
+		widget.NewLabel("Duration:"), durationLabel,
+		widget.NewLabel("Resolution:"), resLabel,
+		widget.NewLabel("Frame Rate:"), fpsLabel,
+		widget.NewLabel("Transfer:"), sizeLabel,
+	))
 
 	rightPanel := container.NewVBox(
 		connectionForm,
@@ -245,18 +239,10 @@ func (c *Controller) BuildRemoteTab(w fyne.Window) fyne.CanvasObject {
 	)
 
 	// Viewer panel in center
-	viewerPanel := container.NewBorder(
-		widget.NewLabelWithStyle("Screen", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		nil, nil, nil,
-		container.NewStack(screenImage),
-	)
+	viewerPanel := panelWithTitle("Screen", container.NewStack(screenImage))
 
 	// Log at bottom
-	logPanel := container.NewBorder(
-		widget.NewLabelWithStyle("Activity", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		nil, nil, nil,
-		container.NewVScroll(activityLog),
-	)
+	logPanel := panelWithTitle("Activity", container.NewVScroll(activityLog))
 
 	// Main layout: viewer left, controls right, log bottom
 	mainArea := container.NewHSplit(viewerPanel, rightPanel)

@@ -14,7 +14,7 @@ Transfer files between machines on your LAN, or remotely control machines across
 - **NAT traversal** — STUN + UDP hole punching for cross-network access
 - **Warp codes** — Human-readable connection codes (`warp-729-alpha`)
 - **Session audit** — Hash-chained, tamper-evident logging of every command and file transfer
-- **Token minting** — Scoped OIDC/OAuth2 tokens for automated and headless workflows
+- **Computer use** — AI-driven screen capture and mouse/keyboard control on remote machines
 - **REST API** — Claude Code integration for programmatic access
 - **Cross-platform** — macOS (arm64/amd64) and Linux (amd64/arm64)
 - **GUI** — Cross-platform desktop app via Fyne
@@ -69,67 +69,33 @@ ztransfer remote host --relay https://ztransfer-relay-xxx.run.app
 ztransfer remote shell warp-429-delta --relay https://ztransfer-relay-xxx.run.app
 ```
 
-### Token Minting (Automated/Headless)
+### Computer Use
 
-For CI/CD pipelines, GCP VMs, or Claude operator workflows where interactive login isn't possible:
+Start a computer use session to see and control a remote machine's screen — ideal for GUI-based tasks or AI agent control loops.
 
 ```bash
-# Mint a scoped identity token for relay authentication
-export ZTRANSFER_RELAY_TOKEN=$(ztransfer-mint --scope relay)
+# Start a computer use session (remote machine must be hosting)
+curl -s -X POST http://localhost:9877/api/remote/computer/start \
+  -d '{"code":"warp-429-delta"}'
+# Returns: {"session": "cu-abc123", "screen_info": {"width": 1920, "height": 1080, ...}}
 
-# Token sources (tried in order):
-#   1. GCP metadata server (on VMs — zero config)
-#   2. Application Default Credentials (gcloud auth application-default login)
-#   3. gcloud CLI fallback
+# Take a screenshot
+curl -s 'http://localhost:9877/api/remote/computer/screen?session=cu-abc123&format=jpeg&quality=65'
 
-# Available scopes
-ztransfer-mint --scope relay        # Relay authentication
-ztransfer-mint --scope diagnostic   # Read-only diagnostics
-ztransfer-mint --scope repair       # Full repair session
-ztransfer-mint --scope full         # All permissions
+# Click, type, scroll
+curl -s -X POST http://localhost:9877/api/remote/computer/action \
+  -d '{"session":"cu-abc123","action":{"type":"click","x":500,"y":300}}'
+curl -s -X POST http://localhost:9877/api/remote/computer/action \
+  -d '{"session":"cu-abc123","action":{"type":"type","text":"Hello from Claude"}}'
 
-# Access tokens for direct API calls
-ztransfer-mint --type access --scope relay
+# Stop session
+curl -s -X POST http://localhost:9877/api/remote/computer/stop \
+  -d '{"session":"cu-abc123"}'
 ```
 
 ### Session Audit
 
-Every remote session produces a tamper-evident audit log — a hash-chained sequence of events where each entry references the SHA-256 hash of the previous one. Modifying, inserting, or removing any event breaks the chain.
-
-```bash
-# Verify a session log hasn't been tampered with
-ztransfer-audit verify session.log
-
-# Output:
-# VERIFIED — 15 events, chain intact
-#   Session:  sess-2026-0313-001
-#   Operator: operator@company.co.uk
-#   Target:   client-laptop-WIN10-JB
-
-# Get a readable session report
-ztransfer-audit summary session.log
-
-# Output:
-# ═══════════════════════════════════════════════════
-#   SESSION AUDIT REPORT
-# ═══════════════════════════════════════════════════
-#   Session ID:  sess-2026-0313-001
-#   Operator:    operator@company.co.uk
-#   Target:      client-laptop-WIN10-JB
-#   Duration:    12m 34s
-#   Chain:       ✓ VERIFIED (all hashes valid)
-#   Commands:    6 executed
-#   Files:       1 transferred
-#   ─── Commands ──────────────────────────────────
-#     1. systemctl status nginx
-#     2. journalctl -u nginx --since '1 hour ago'
-#     ...
-
-# Machine-readable output
-ztransfer-audit verify --json session.log
-```
-
-Audit logs can also stream to BigQuery in real time for centralised monitoring and customer-facing dashboards.
+Every remote session produces a tamper-evident audit log — a hash-chained sequence of events where each entry references the SHA-256 hash of the previous one. Modifying, inserting, or removing any event breaks the chain. Audit logs are written as NDJSON files and can optionally stream to BigQuery for centralised monitoring.
 
 ### Claude Code API
 
@@ -155,6 +121,15 @@ curl -X POST http://localhost:9877/api/get \
 # Execute command on remote machine
 curl -X POST http://localhost:9877/api/remote/exec \
   -d '{"code":"warp-429-delta","command":"uname -a"}'
+
+# Start computer use session
+curl -X POST http://localhost:9877/api/remote/computer/start \
+  -d '{"code":"warp-429-delta"}'
+
+# Screenshot + click
+curl 'http://localhost:9877/api/remote/computer/screen?session=cu-abc123'
+curl -X POST http://localhost:9877/api/remote/computer/action \
+  -d '{"session":"cu-abc123","action":{"type":"click","x":500,"y":300}}'
 ```
 
 ## Commands
@@ -172,10 +147,6 @@ ztransfer remote shell CODE                   Interactive shell
 ztransfer remote exec CODE COMMAND            Run command remotely
 ztransfer api [--port PORT]                   Start REST API
 ztransfer version                             Show version
-
-ztransfer-mint --scope SCOPE [--type TYPE]    Mint scoped auth tokens
-ztransfer-audit verify FILE                   Verify audit log chain
-ztransfer-audit summary FILE                  Session audit report
 ```
 
 ## How It Works
@@ -211,31 +182,24 @@ ztransfer-audit summary FILE                  Session audit report
 ## Building
 
 ```bash
-# Main CLI
+# CLI
 go build ./cmd/ztransfer/
 
-# Token minter (no CGO required)
-go build ./cmd/ztransfer-mint/
-
-# Audit verifier (no CGO required)
-go build ./cmd/ztransfer-audit/
+# GUI (requires Fyne)
+go build ./cmd/ztransfer-gui/
 ```
 
-The main CLI requires CGO for the post-quantum crypto library. Prebuilt static libraries are included for:
+Requires CGO for the post-quantum crypto library. Prebuilt static libraries are included for:
 - `darwin-arm64` (Apple Silicon Mac)
 - `darwin-amd64` (Intel Mac)
 - `linux-amd64` (x86_64 Linux)
 - `linux-arm64` (ARM64 Linux)
-
-The `ztransfer-mint` and `ztransfer-audit` binaries are pure Go with no CGO dependency.
 
 ## Project Structure
 
 ```
 cmd/ztransfer/         CLI binary
 cmd/ztransfer-gui/     Desktop GUI (Fyne)
-cmd/ztransfer-mint/    Scoped token minter for automated workflows
-cmd/ztransfer-audit/   Session audit log verifier
 pkg/auth/              Identity, pairing, peer store, TLS
 pkg/crypto/            Post-quantum crypto FFI (ML-DSA-65)
 pkg/server/            HTTPS file server

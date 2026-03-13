@@ -160,9 +160,7 @@ func (c *Controller) BuildServerTab(w fyne.Window) fyne.CanvasObject {
 	})
 
 	// === Layout ===
-	configSection := container.NewVBox(
-		widget.NewLabelWithStyle("Server Configuration", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	configSection := panelWithTitle("Server Configuration", container.NewVBox(
 		container.NewHBox(
 			widget.NewLabel("Directory:"),
 			dirLabel,
@@ -183,21 +181,15 @@ func (c *Controller) BuildServerTab(w fyne.Window) fyne.CanvasObject {
 		),
 		widget.NewSeparator(),
 		container.NewHBox(layout.NewSpacer(), toggleButton, layout.NewSpacer()),
-	)
+	))
 
-	infoSection := container.NewVBox(
-		widget.NewLabelWithStyle("Connection Info", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	infoSection := panelWithTitle("Connection Info", container.NewVBox(
 		container.NewHBox(widget.NewLabel("Address:"), addressLabel),
 		container.NewHBox(widget.NewLabel("Pair Token:"), tokenLabel),
 		container.NewHBox(widget.NewLabel("Pair Command:"), pairCommandLabel),
-	)
+	))
 
-	logSection := container.NewVBox(
-		widget.NewLabelWithStyle("Connection Log", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
-		logText,
-	)
+	logSection := panelWithTitle("Connection Log", logText)
 
 	return container.NewVBox(
 		configSection,

@@ -105,9 +105,7 @@ func (c *Controller) BuildPeersTab() fyne.CanvasObject {
 	})
 
 	// === Layout ===
-	detailSection := container.NewVBox(
-		widget.NewLabelWithStyle("Peer Details", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	detailSection := panelWithTitle("Peer Details", container.NewVBox(
 		container.New(layout.NewFormLayout(),
 			widget.NewLabel("Name:"), nameValue,
 			widget.NewLabel("Address:"), addressValue,
@@ -116,17 +114,15 @@ func (c *Controller) BuildPeersTab() fyne.CanvasObject {
 		),
 		widget.NewSeparator(),
 		removeButton,
-	)
+	))
 
-	pairSection := container.NewVBox(
-		widget.NewLabelWithStyle("Pair New Peer", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	pairSection := panelWithTitle("Pair New Peer", container.NewVBox(
 		container.New(layout.NewFormLayout(),
 			widget.NewLabel("Address:"), addrEntry,
 			widget.NewLabel("Token:"), tokenEntry,
 		),
 		container.NewHBox(pairButton, pairStatus),
-	)
+	))
 
 	rightPanel := container.NewVBox(
 		detailSection,
@@ -134,11 +130,7 @@ func (c *Controller) BuildPeersTab() fyne.CanvasObject {
 		pairSection,
 	)
 
-	peerPanel := container.NewBorder(
-		widget.NewLabelWithStyle("Known Peers", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-		nil, nil, nil,
-		peerList,
-	)
+	peerPanel := panelWithTitle("Known Peers", peerList)
 
 	split := container.NewHSplit(peerPanel, rightPanel)
 	split.SetOffset(0.35)

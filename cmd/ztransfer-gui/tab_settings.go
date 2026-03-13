@@ -37,21 +37,15 @@ func (c *Controller) BuildSettingsTab(a fyne.App) fyne.CanvasObject {
 	themeSelect.SetSelected("Dark")
 
 	// Identity info
-	identitySection := container.NewVBox(
-		widget.NewLabelWithStyle("Identity", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
-		container.New(layout.NewFormLayout(),
-			widget.NewLabel("Name:"), widget.NewLabel(c.identity.Name),
-			widget.NewLabel("Fingerprint:"), widget.NewLabelWithStyle(c.identity.Fingerprint(), fyne.TextAlignLeading, fyne.TextStyle{Monospace: true}),
-			widget.NewLabel("Algorithm:"), widget.NewLabel("ML-DSA-65 (FIPS 204)"),
-			widget.NewLabel("Key Size:"), widget.NewLabel("1952 bytes (public) / 4032 bytes (secret)"),
-		),
-	)
+	identitySection := panelWithTitle("Identity", container.New(layout.NewFormLayout(),
+		widget.NewLabel("Name:"), widget.NewLabel(c.identity.Name),
+		widget.NewLabel("Fingerprint:"), widget.NewLabelWithStyle(c.identity.Fingerprint(), fyne.TextAlignLeading, fyne.TextStyle{Monospace: true}),
+		widget.NewLabel("Algorithm:"), widget.NewLabel("ML-DSA-65 (FIPS 204)"),
+		widget.NewLabel("Key Size:"), widget.NewLabel("1952 bytes (public) / 4032 bytes (secret)"),
+	))
 
 	// About section
-	aboutSection := container.NewVBox(
-		widget.NewLabelWithStyle("About", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
+	aboutSection := panelWithTitle("About", container.NewVBox(
 		container.New(layout.NewFormLayout(),
 			widget.NewLabel("Version:"), widget.NewLabel(appVersion),
 			widget.NewLabel("Quantum Vault:"), widget.NewLabel(crypto.Version()),
@@ -61,18 +55,14 @@ func (c *Controller) BuildSettingsTab(a fyne.App) fyne.CanvasObject {
 		),
 		widget.NewSeparator(),
 		widget.NewLabel("Quantum Encoding Ltd"),
-	)
+	))
 
 	// Preferences section
-	prefsSection := container.NewVBox(
-		widget.NewLabelWithStyle("Preferences", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
-		widget.NewSeparator(),
-		container.New(layout.NewFormLayout(),
-			widget.NewLabel("Download Dir:"), downloadEntry,
-			widget.NewLabel("Default Port:"), portEntry,
-			widget.NewLabel("Theme:"), themeSelect,
-		),
-	)
+	prefsSection := panelWithTitle("Preferences", container.New(layout.NewFormLayout(),
+		widget.NewLabel("Download Dir:"), downloadEntry,
+		widget.NewLabel("Default Port:"), portEntry,
+		widget.NewLabel("Theme:"), themeSelect,
+	))
 
 	settingsPanels := container.NewAppTabs(
 		container.NewTabItem("Preferences", container.NewVBox(prefsSection)),
