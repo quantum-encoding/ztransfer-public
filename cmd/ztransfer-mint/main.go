@@ -49,8 +49,8 @@ var scopeMap = map[string][]string{
 }
 
 const (
-	defaultServiceAccount = "ztransfer-agent@ztransfer-gcp-relay.iam.gserviceaccount.com"
-	defaultAudience       = "https://ztransfer-relay-967904281608.europe-west1.run.app"
+	defaultServiceAccount = "ztransfer-agent@warpgate-auth.iam.gserviceaccount.com"
+	defaultAudience       = "https://ztransfer-relay-796870026202.europe-west1.run.app"
 	metadataURL           = "http://metadata.google.internal/computeMetadata/v1"
 	iamCredentialsURL     = "https://iamcredentials.googleapis.com/v1"
 )

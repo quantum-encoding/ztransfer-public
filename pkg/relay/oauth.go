@@ -45,13 +45,19 @@ type OAuthConfig struct {
 	// When set, the relay validates JWTs using the issuer's JWKS.
 	Issuer string
 
-	// Audience is the expected "aud" claim in the JWT.
-	// For GCP Cloud Run, this is the service URL.
-	Audience string
+	// Audiences is the list of accepted "aud" claims in the JWT.
+	// Typically includes the OAuth client ID and the Cloud Run service URL.
+	Audiences []string
 
 	// AllowedEmails restricts access to specific email addresses found in
 	// the "email" claim. If empty, any valid token from the issuer is accepted.
+	// This is the static fallback — prefer Firestore for dynamic management.
 	AllowedEmails []string
+
+	// Firestore is an optional Firestore-backed email allowlist.
+	// When set, email authorization is checked against Firestore first,
+	// falling back to AllowedEmails if Firestore is unreachable.
+	Firestore *FirestoreAllowlist
 
 	// StaticToken is a fallback static Bearer token. If set and no Issuer
 	// is configured, simple string comparison is used.
@@ -82,16 +88,40 @@ func oauthMiddleware(cfg *OAuthConfig, next http.Handler) http.Handler {
 
 		// OIDC JWT validation mode.
 		if cfg.Issuer != "" && jwks != nil {
-			claims, err := validateJWT(token, jwks, cfg.Issuer, cfg.Audience)
-			if err != nil {
-				http.Error(w, fmt.Sprintf(`{"error":"token validation failed: %s"}`, err), http.StatusUnauthorized)
+			// Try each accepted audience until one validates.
+			var claims map[string]any
+			var lastErr error
+			for _, aud := range cfg.Audiences {
+				claims, lastErr = validateJWT(token, jwks, cfg.Issuer, aud)
+				if lastErr == nil {
+					break
+				}
+			}
+			// If no audiences configured, validate without audience check.
+			if len(cfg.Audiences) == 0 {
+				claims, lastErr = validateJWT(token, jwks, cfg.Issuer, "")
+			}
+			if lastErr != nil {
+				http.Error(w, fmt.Sprintf(`{"error":"token validation failed: %s"}`, lastErr), http.StatusUnauthorized)
 				return
 			}
 
-			// Check allowed emails if configured.
-			if len(cfg.AllowedEmails) > 0 {
-				email, _ := claims["email"].(string)
-				if !containsString(cfg.AllowedEmails, email) {
+			// Check email authorization.
+			email, _ := claims["email"].(string)
+			if cfg.Firestore != nil || len(cfg.AllowedEmails) > 0 {
+				authorized := false
+
+				// Check Firestore first (dynamic allowlist).
+				if cfg.Firestore != nil {
+					authorized = cfg.Firestore.IsAuthorized(email)
+				}
+
+				// Fall back to static allowlist.
+				if !authorized && len(cfg.AllowedEmails) > 0 {
+					authorized = containsString(cfg.AllowedEmails, email)
+				}
+
+				if !authorized {
 					http.Error(w, `{"error":"email not authorized"}`, http.StatusForbidden)
 					return
 				}

@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Authorized users — relay allowlist.
+    // Only admins (server-side with service account) can read/write.
+    // Client-side access is denied.
+    match /authorized_users/{email} {
+      allow read, write: if false;
+    }
+
+    // Support requests — submitted by authenticated users.
+    match /support_requests/{requestId} {
+      // Authenticated users can create requests.
+      allow create: if request.auth != null
+                    && request.resource.data.email == request.auth.token.email;
+      // Users can read their own requests.
+      allow read: if request.auth != null
+                  && resource.data.email == request.auth.token.email;
+      // Only admins can update/delete (server-side).
+      allow update, delete: if false;
+    }
+
+    // Sessions — audit trail of remote sessions.
+    // Server-side only (written by relay/CLI with service account).
+    match /sessions/{sessionId} {
+      allow read, write: if false;
+    }
+
+    // Users — profiles and metadata.
+    match /users/{userId} {
+      // Users can read their own profile.
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Only server-side can write.
+      allow write: if false;
+    }
+
+    // Default deny.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

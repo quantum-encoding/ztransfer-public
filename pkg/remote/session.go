@@ -212,6 +212,14 @@ func relayConfigFromEnv() *nat.RelayConfig {
 
 	token := os.Getenv("ZTRANSFER_RELAY_TOKEN")
 	if token == "" {
+		// Try stored OAuth credentials from 'ztransfer login'.
+		if creds, err := auth.LoadCredentials(); err == nil {
+			if idToken, err := creds.GetIDToken(); err == nil {
+				token = idToken
+			}
+		}
+	}
+	if token == "" {
 		token = fetchGCloudToken(url)
 	}
 

@@ -46,6 +46,16 @@ func main() {
 		cmdStatus(os.Args[2:])
 	case "remote":
 		cmdRemote(os.Args[2:])
+	case "login":
+		cmdLogin()
+	case "logout":
+		cmdLogout()
+	case "admin":
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "Usage: ztransfer admin <authorize|deauthorize> EMAIL")
+			os.Exit(1)
+		}
+		cmdAdmin(os.Args[2:])
 	case "version":
 		fmt.Printf("ztransfer %s (quantum vault %s)\n", version, crypto.Version())
 	case "help", "--help", "-h":
@@ -91,6 +101,14 @@ Remote Access:
   remote connect    Connect to a hosted session
   remote shell      Open interactive shell on remote machine
   remote exec       Run a single command on remote machine
+
+Authentication:
+  login             Sign in with Google (opens browser)
+  logout            Remove stored credentials
+
+Admin:
+  admin authorize EMAIL [--scope SCOPE]     Add user to relay allowlist
+  admin deauthorize EMAIL                   Remove user from relay allowlist
 
 API Mode (for Claude Code):
   ztransfer api --port 9877
@@ -551,4 +569,92 @@ func formatBytes(b int64) string {
 func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "  error: "+format+"\n", args...)
 	os.Exit(1)
+}
+
+// --------------------------------------------------------------------------
+// Authentication commands
+// --------------------------------------------------------------------------
+
+func cmdLogin() {
+	// Check for existing credentials.
+	if creds, err := auth.LoadCredentials(); err == nil {
+		fmt.Printf("  Already logged in as %s\n", creds.Email)
+		fmt.Println("  Run 'ztransfer logout' first to switch accounts.")
+		return
+	}
+
+	fmt.Println("  ztransfer login — Sign in with Google\n")
+
+	creds, err := auth.RunLoginFlow()
+	if err != nil {
+		fatal("login: %v", err)
+	}
+
+	fmt.Printf("\n  Logged in as %s\n", creds.Email)
+	fmt.Println("  Credentials saved to ~/.ztransfer/credentials.json")
+}
+
+func cmdLogout() {
+	creds, err := auth.LoadCredentials()
+	if err != nil {
+		fmt.Println("  Not logged in.")
+		return
+	}
+
+	if err := auth.DeleteCredentials(); err != nil {
+		fatal("logout: %v", err)
+	}
+	fmt.Printf("  Logged out (%s)\n", creds.Email)
+	fmt.Println("  Credentials removed from ~/.ztransfer/credentials.json")
+}
+
+func cmdAdmin(args []string) {
+	switch args[0] {
+	case "authorize":
+		if len(args) < 2 {
+			fatal("usage: ztransfer admin authorize EMAIL [--scope SCOPE]")
+		}
+		email := args[1]
+		scope := getFlag(args, "--scope", "relay")
+
+		creds, err := auth.LoadCredentials()
+		if err != nil {
+			fatal("not logged in — run 'ztransfer login' first")
+		}
+
+		// Refresh token if needed.
+		if _, err := creds.GetIDToken(); err != nil {
+			fatal("refresh token: %v", err)
+		}
+
+		fmt.Printf("  Authorizing %s (scope: %s)...\n", email, scope)
+		if err := auth.AuthorizeUser(creds.AccessToken, email, "", creds.Email, scope); err != nil {
+			fatal("authorize: %v", err)
+		}
+		fmt.Printf("  Done — %s can now connect to the relay\n", email)
+
+	case "deauthorize":
+		if len(args) < 2 {
+			fatal("usage: ztransfer admin deauthorize EMAIL")
+		}
+		email := args[1]
+
+		creds, err := auth.LoadCredentials()
+		if err != nil {
+			fatal("not logged in — run 'ztransfer login' first")
+		}
+
+		if _, err := creds.GetIDToken(); err != nil {
+			fatal("refresh token: %v", err)
+		}
+
+		fmt.Printf("  Deauthorizing %s...\n", email)
+		if err := auth.DeauthorizeUser(creds.AccessToken, email); err != nil {
+			fatal("deauthorize: %v", err)
+		}
+		fmt.Printf("  Done — %s removed from relay allowlist\n", email)
+
+	default:
+		fatal("unknown admin command: %s (use authorize or deauthorize)", args[0])
+	}
 }

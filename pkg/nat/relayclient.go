@@ -12,7 +12,7 @@ import (
 )
 
 // DefaultRelayURL is the production relay server on GCP Cloud Run.
-const DefaultRelayURL = "https://ztransfer-relay-967904281608.europe-west1.run.app"
+const DefaultRelayURL = "https://ztransfer-relay-796870026202.europe-west1.run.app"
 
 // RelayConfig holds the configuration for relay fallback.
 type RelayConfig struct {
