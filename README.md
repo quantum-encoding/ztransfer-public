@@ -132,6 +132,43 @@ curl -X POST http://localhost:9877/api/remote/computer/action \
   -d '{"session":"cu-abc123","action":{"type":"click","x":500,"y":300}}'
 ```
 
+### Token Minting
+
+For automated and headless workflows — mint scoped tokens for relay authentication:
+
+```bash
+# Mint a relay identity token (for authenticating to the relay)
+export ZTRANSFER_RELAY_TOKEN=$(ztransfer-mint --scope relay)
+
+# Mint a scoped access token (for authorising remote sessions)
+ztransfer-mint --scope repair --type access
+
+# Available scopes
+ztransfer-mint --scope relay        # Relay authentication
+ztransfer-mint --scope diagnostic   # Read-only diagnostics
+ztransfer-mint --scope repair       # Full repair session
+ztransfer-mint --scope full         # All permissions
+```
+
+Token sources (tried in order):
+1. GCP metadata server (on VMs — zero config)
+2. Application Default Credentials (`gcloud auth application-default login`)
+3. Service account key file (`GOOGLE_APPLICATION_CREDENTIALS`)
+4. gcloud CLI fallback (identity tokens only)
+
+### Session Audit Verification
+
+Verify and inspect tamper-evident session logs:
+
+```bash
+# Verify a session log hasn't been tampered with
+ztransfer-audit verify session.log
+# Output: VERIFIED — 15 events, chain intact
+
+# Get a readable session report
+ztransfer-audit summary session.log
+```
+
 ## Commands
 
 ```
@@ -147,6 +184,10 @@ ztransfer remote shell CODE                   Interactive shell
 ztransfer remote exec CODE COMMAND            Run command remotely
 ztransfer api [--port PORT]                   Start REST API
 ztransfer version                             Show version
+
+ztransfer-mint --scope SCOPE [--type TYPE]    Mint scoped auth tokens
+ztransfer-audit verify FILE                   Verify audit log chain
+ztransfer-audit summary FILE                  Session audit report
 ```
 
 ## How It Works
@@ -187,19 +228,29 @@ go build ./cmd/ztransfer/
 
 # GUI (requires Fyne)
 go build ./cmd/ztransfer-gui/
+
+# Token minter (pure Go, no CGO required)
+go build ./cmd/ztransfer-mint/
+
+# Audit verifier (pure Go, no CGO required)
+go build ./cmd/ztransfer-audit/
 ```
 
-Requires CGO for the post-quantum crypto library. Prebuilt static libraries are included for:
+The main CLI and GUI require CGO for the post-quantum crypto library. Prebuilt static libraries are included for:
 - `darwin-arm64` (Apple Silicon Mac)
 - `darwin-amd64` (Intel Mac)
 - `linux-amd64` (x86_64 Linux)
 - `linux-arm64` (ARM64 Linux)
+
+The `ztransfer-mint` and `ztransfer-audit` binaries are pure Go with no CGO dependency.
 
 ## Project Structure
 
 ```
 cmd/ztransfer/         CLI binary
 cmd/ztransfer-gui/     Desktop GUI (Fyne)
+cmd/ztransfer-mint/    Scoped token minter for automated workflows
+cmd/ztransfer-audit/   Session audit log verifier
 pkg/auth/              Identity, pairing, peer store, TLS
 pkg/crypto/            Post-quantum crypto FFI (ML-DSA-65)
 pkg/server/            HTTPS file server
