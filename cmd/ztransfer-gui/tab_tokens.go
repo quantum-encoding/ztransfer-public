@@ -12,11 +12,88 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+
+	"github.com/quantum-encoding/ztransfer/pkg/auth"
 )
 
-// BuildTokensTab creates the token minting interface.
+// BuildTokensTab creates the authentication and token minting interface.
 func (c *Controller) BuildTokensTab() fyne.CanvasObject {
-	// === Scope selector ===
+	// =================================================================
+	// Google Login section
+	// =================================================================
+	loginStatusLabel := widget.NewLabel("")
+	loginStatusLabel.TextStyle = fyne.TextStyle{Monospace: true}
+
+	emailLabel := widget.NewLabel("Not logged in")
+	emailLabel.TextStyle = fyne.TextStyle{Bold: true}
+
+	expiryLabel := widget.NewLabel("")
+
+	// Check for existing credentials on load.
+	if creds, err := auth.LoadCredentials(); err == nil {
+		emailLabel.SetText(creds.Email)
+		if !creds.Expiry.IsZero() {
+			expiryLabel.SetText("Token expires: " + creds.Expiry.Format("15:04 02 Jan 2006"))
+		}
+		loginStatusLabel.SetText("✓ Logged in")
+	}
+
+	var loginBtn *widget.Button
+	var logoutBtn *widget.Button
+
+	loginBtn = widget.NewButtonWithIcon("Sign in with Google", theme.LoginIcon(), func() {
+		loginStatusLabel.SetText("Opening browser...")
+		loginBtn.Disable()
+
+		go func() {
+			creds, err := auth.RunLoginFlow()
+
+			fyne.Do(func() {
+				loginBtn.Enable()
+				if err != nil {
+					loginStatusLabel.SetText("Error: " + err.Error())
+					return
+				}
+
+				emailLabel.SetText(creds.Email)
+				if !creds.Expiry.IsZero() {
+					expiryLabel.SetText("Token expires: " + creds.Expiry.Format("15:04 02 Jan 2006"))
+				}
+				loginStatusLabel.SetText("✓ Logged in as " + creds.Email)
+				logoutBtn.Enable()
+			})
+		}()
+	})
+	loginBtn.Importance = widget.HighImportance
+
+	logoutBtn = widget.NewButtonWithIcon("Sign out", theme.LogoutIcon(), func() {
+		if creds, err := auth.LoadCredentials(); err == nil {
+			auth.DeleteCredentials()
+			loginStatusLabel.SetText("Signed out (" + creds.Email + ")")
+		} else {
+			loginStatusLabel.SetText("Not logged in")
+		}
+		emailLabel.SetText("Not logged in")
+		expiryLabel.SetText("")
+	})
+
+	// Disable logout if not logged in.
+	if _, err := auth.LoadCredentials(); err != nil {
+		logoutBtn.Disable()
+	}
+
+	loginPanel := panelWithTitle("Google Login", container.NewVBox(
+		container.New(layout.NewFormLayout(),
+			widget.NewLabel("Account:"), emailLabel,
+			widget.NewLabel(""), expiryLabel,
+		),
+		container.NewHBox(loginBtn, logoutBtn),
+		loginStatusLabel,
+	))
+
+	// =================================================================
+	// Token minting section (admin)
+	// =================================================================
 	scopeSelect := widget.NewSelect(
 		[]string{"relay", "diagnostic", "repair", "full"},
 		nil,
@@ -29,27 +106,24 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 	)
 	typeSelect.SetSelected("identity")
 
-	// === Token output ===
 	tokenOutput := widget.NewMultiLineEntry()
 	tokenOutput.SetMinRowsVisible(4)
 	tokenOutput.TextStyle = fyne.TextStyle{Monospace: true}
 	tokenOutput.Wrapping = fyne.TextWrapBreak
 	tokenOutput.Disable()
 
-	statusLabel := widget.NewLabel("")
-	statusLabel.TextStyle = fyne.TextStyle{Monospace: true}
+	mintStatusLabel := widget.NewLabel("")
+	mintStatusLabel.TextStyle = fyne.TextStyle{Monospace: true}
 
-	// === Token source info ===
 	sourceLabel := widget.NewLabel("—")
 	saLabel := widget.NewLabel("—")
 	audienceLabel := widget.NewLabel("—")
 
-	// === Mint button ===
 	mintBtn := widget.NewButtonWithIcon("Mint Token", theme.ConfirmIcon(), func() {
 		scope := scopeSelect.Selected
 		tokenType := typeSelect.Selected
 
-		statusLabel.SetText("Minting...")
+		mintStatusLabel.SetText("Minting...")
 		tokenOutput.SetText("")
 
 		go func() {
@@ -60,23 +134,21 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 
 			fyne.Do(func() {
 				if err != nil {
-					statusLabel.SetText("Error: " + err.Error())
+					mintStatusLabel.SetText("Error: " + err.Error())
 					tokenOutput.SetText(output)
 					return
 				}
 
-				// Parse verbose output — last line is the token, lines before are info
 				lines := strings.Split(strings.TrimSpace(output), "\n")
 				if len(lines) == 0 {
-					statusLabel.SetText("No output")
+					mintStatusLabel.SetText("No output")
 					return
 				}
 
 				token := lines[len(lines)-1]
 				tokenOutput.SetText(token)
-				statusLabel.SetText(fmt.Sprintf("✓ Token minted (%d chars)", len(token)))
+				mintStatusLabel.SetText(fmt.Sprintf("✓ Token minted (%d chars)", len(token)))
 
-				// Parse info lines
 				for _, line := range lines[:len(lines)-1] {
 					parts := strings.SplitN(line, ": ", 2)
 					if len(parts) != 2 {
@@ -85,26 +157,13 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 					key := strings.TrimSpace(parts[0])
 					val := strings.TrimSpace(parts[1])
 					switch key {
-					case "scope":
-						// already shown in selector
 					case "service_account":
 						saLabel.SetText(val)
 					case "audience":
 						audienceLabel.SetText(val)
-					case "type":
-						// already shown
-					default:
-						if strings.Contains(line, "metadata") {
-							sourceLabel.SetText("GCP Metadata Server")
-						} else if strings.Contains(line, "ADC") {
-							sourceLabel.SetText("Application Default Credentials")
-						} else if strings.Contains(line, "gcloud") {
-							sourceLabel.SetText("gcloud CLI")
-						}
 					}
 				}
 
-				// Detect source from output
 				if strings.Contains(output, "IAM failed") && strings.Contains(output, "gcloud") {
 					sourceLabel.SetText("gcloud CLI (IAM fallback)")
 				} else if strings.Contains(output, "metadata") {
@@ -117,37 +176,23 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 	})
 	mintBtn.Importance = widget.HighImportance
 
-	// === Copy button ===
 	copyBtn := widget.NewButtonWithIcon("Copy to Clipboard", theme.ContentCopyIcon(), func() {
 		if tokenOutput.Text != "" {
 			w := fyne.CurrentApp().Driver().AllWindows()
 			if len(w) > 0 {
 				w[0].Clipboard().SetContent(tokenOutput.Text)
-				statusLabel.SetText("✓ Copied to clipboard")
+				mintStatusLabel.SetText("✓ Copied to clipboard")
 			}
 		}
 	})
 
-	// === Scope descriptions ===
-	scopeDesc := widget.NewRichTextFromMarkdown(
-		"**Scopes:**\n" +
-			"- `relay` — authenticate to Cloud Run relay\n" +
-			"- `diagnostic` — read-only system inspection\n" +
-			"- `repair` — full repair session access\n" +
-			"- `full` — all permissions\n\n" +
-			"**Token types:**\n" +
-			"- `identity` — OIDC token for Cloud Run auth\n" +
-			"- `access` — OAuth2 token for direct API calls",
-	)
-
-	// === Layout ===
-	mintForm := panelWithTitle("Mint Token", container.NewVBox(
+	mintForm := panelWithTitle("Mint Token (Admin)", container.NewVBox(
 		container.New(layout.NewFormLayout(),
 			widget.NewLabel("Scope:"), scopeSelect,
 			widget.NewLabel("Type:"), typeSelect,
 		),
 		container.NewHBox(mintBtn, copyBtn),
-		statusLabel,
+		mintStatusLabel,
 	))
 
 	tokenPanel := panelWithTitle("Token", tokenOutput)
@@ -158,7 +203,29 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 		widget.NewLabel("Audience:"), audienceLabel,
 	))
 
+	// =================================================================
+	// Reference
+	// =================================================================
+	scopeDesc := widget.NewRichTextFromMarkdown(
+		"**Google Login** signs you in with your Google account.\n" +
+			"Once logged in, relay connections are automatic.\n\n" +
+			"**Token Minting** is for admin/automated workflows.\n\n" +
+			"**Scopes:**\n" +
+			"- `relay` — authenticate to Cloud Run relay\n" +
+			"- `diagnostic` — read-only system inspection\n" +
+			"- `repair` — full repair session access\n" +
+			"- `full` — all permissions\n\n" +
+			"**Token types:**\n" +
+			"- `identity` — OIDC token for Cloud Run auth\n" +
+			"- `access` — OAuth2 token for direct API calls",
+	)
+
+	// =================================================================
+	// Layout
+	// =================================================================
 	leftPanel := container.NewVBox(
+		loginPanel,
+		widget.NewSeparator(),
 		mintForm,
 		widget.NewSeparator(),
 		tokenPanel,
