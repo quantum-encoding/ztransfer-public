@@ -10,8 +10,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-
-	"github.com/quantum-encoding/ztransfer/pkg/crypto"
 )
 
 // BuildStatusBar creates the bottom status bar.
@@ -23,7 +21,7 @@ func (c *Controller) BuildStatusBar() fyne.CanvasObject {
 	dot := canvas.NewCircle(theme.DisabledColor())
 	dot.Resize(fyne.NewSize(8, 8))
 
-	versionLabel := widget.NewLabel(fmt.Sprintf("ztransfer %s · quantum vault %s · Quantum Encoding Ltd", appVersion, crypto.Version()))
+	versionLabel := widget.NewLabel(fmt.Sprintf("v%s", appVersion))
 	versionLabel.TextStyle = fyne.TextStyle{Monospace: true}
 
 	// Auto-update status

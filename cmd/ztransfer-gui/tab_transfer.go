@@ -196,16 +196,6 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 		}()
 	}
 
-	// Peer selection -> load files
-	peerList.OnSelected = func(id widget.ListItemID) {
-		peers := c.peerStore.ListPeers()
-		if id < len(peers) {
-			c.selectedPeer = peers[id].Name
-			currentPath = "/"
-			refreshFiles()
-		}
-	}
-
 	// Track selected file index
 	selectedFileIdx := -1
 
@@ -362,7 +352,31 @@ func (c *Controller) BuildTransferTab(w fyne.Window) fyne.CanvasObject {
 		fileList,
 	)
 
-	peerPanel := panelWithTitle("Peers", peerList)
+	// Empty state hint when no peers exist
+	emptyHint := widget.NewLabelWithStyle(
+		"No machines paired yet.\nGo to the Connect tab to get started.",
+		fyne.TextAlignCenter, fyne.TextStyle{Italic: true},
+	)
+	emptyHint.Wrapping = fyne.TextWrapWord
+
+	var peerContent fyne.CanvasObject
+	if len(c.peerStore.ListPeers()) == 0 {
+		peerContent = container.NewCenter(emptyHint)
+	} else {
+		peerContent = peerList
+	}
+
+	// Re-check on peer list data change
+	peerList.OnSelected = func(id widget.ListItemID) {
+		peers := c.peerStore.ListPeers()
+		if id < len(peers) {
+			c.selectedPeer = peers[id].Name
+			currentPath = "/"
+			refreshFiles()
+		}
+	}
+
+	peerPanel := panelWithTitle("Peers", peerContent)
 
 	split := container.NewHSplit(peerPanel, rightPanel)
 	split.SetOffset(0.22)

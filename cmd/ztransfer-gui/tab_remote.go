@@ -25,10 +25,10 @@ func (c *Controller) BuildRemoteTab(w fyne.Window) fyne.CanvasObject {
 	codeEntry.SetPlaceHolder("warp-429-delta")
 
 	modeSelect := widget.NewSelect(
-		[]string{"Terminal", "Viewer (Control)", "Viewer (Watch)", "Computer Use (AI)"},
+		[]string{"Command Line", "See & Control Screen", "Watch Screen Only", "AI Assistant"},
 		nil,
 	)
-	modeSelect.SetSelected("Viewer (Control)")
+	modeSelect.SetSelected("See & Control Screen")
 
 	statusLabel := widget.NewLabel("Not connected")
 	statusLabel.TextStyle = fyne.TextStyle{Monospace: true}
@@ -36,11 +36,11 @@ func (c *Controller) BuildRemoteTab(w fyne.Window) fyne.CanvasObject {
 	statusDot.Resize(fyne.NewSize(10, 10))
 
 	// === Session info ===
-	peerLabel := widget.NewLabel("—")
-	durationLabel := widget.NewLabel("—")
-	resLabel := widget.NewLabel("—")
-	fpsLabel := widget.NewLabel("—")
-	sizeLabel := widget.NewLabel("—")
+	peerLabel := selectableLabel("—")
+	durationLabel := selectableLabel("—")
+	resLabel := selectableLabelMono("—")
+	fpsLabel := selectableLabel("—")
+	sizeLabel := selectableLabel("—")
 
 	// === Screen viewer ===
 	screenImage := canvas.NewImageFromResource(nil)
@@ -135,18 +135,17 @@ func (c *Controller) BuildRemoteTab(w fyne.Window) fyne.CanvasObject {
 			setConnected(true, session.PeerName)
 
 			switch mode {
-			case "Terminal":
-				logLine("Terminal mode — use the CLI for interactive shell")
-				// Fyne doesn't have a terminal widget, so we point the user to CLI
+			case "Command Line":
+				logLine("Command Line mode — use the CLI for interactive shell")
 				fyne.Do(func() {
 					statusLabel.SetText("Connected — run 'ztransfer remote shell " + code + "' in terminal")
 				})
 
-			case "Viewer (Control)", "Viewer (Watch)":
+			case "See & Control Screen", "Watch Screen Only":
 				client := remote.NewComputerClient(session.Tunnel)
 				activeClient = client
 				stopViewer = make(chan struct{})
-				viewOnly := mode == "Viewer (Watch)"
+				viewOnly := mode == "Watch Screen Only"
 				startTime := time.Now()
 				var frameCount int
 				var totalBytes int64
@@ -202,7 +201,7 @@ func (c *Controller) BuildRemoteTab(w fyne.Window) fyne.CanvasObject {
 				// TODO: mouse/keyboard forwarding from Fyne canvas
 				_ = viewOnly
 
-			case "Computer Use (AI)":
+			case "AI Assistant":
 				client := remote.NewComputerClient(session.Tunnel)
 				activeClient = client
 				logLine("Computer Use session started — use REST API to control")

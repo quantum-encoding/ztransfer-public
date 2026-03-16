@@ -66,7 +66,7 @@ func (t *ztransferTheme) darkColor(name fyne.ThemeColorName) color.Color {
 	case theme.ColorNamePlaceHolder:
 		return color.NRGBA{R: 90, G: 100, B: 120, A: 255}
 	case theme.ColorNameDisabled:
-		return color.NRGBA{R: 90, G: 100, B: 120, A: 255}
+		return color.NRGBA{R: 210, G: 215, B: 225, A: 255}
 	case theme.ColorNameHeaderBackground:
 		return color.NRGBA{R: 15, G: 18, B: 24, A: 255}
 	case theme.ColorNameMenuBackground:
@@ -98,7 +98,7 @@ func (t *ztransferTheme) lightColor(name fyne.ThemeColorName) color.Color {
 	case theme.ColorNamePlaceHolder:
 		return color.NRGBA{R: 148, G: 163, B: 184, A: 255} // #94a3b8
 	case theme.ColorNameDisabled:
-		return color.NRGBA{R: 148, G: 163, B: 184, A: 255}
+		return color.NRGBA{R: 50, G: 60, B: 80, A: 255}
 	case theme.ColorNameHeaderBackground:
 		return color.NRGBA{R: 241, G: 245, B: 249, A: 255}
 	case theme.ColorNameMenuBackground:

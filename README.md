@@ -17,7 +17,7 @@ Transfer files between machines on your LAN, or remotely control machines across
 - **Computer use** — AI-driven screen capture and mouse/keyboard control on remote machines
 - **REST API** — Claude Code integration for programmatic access
 - **Cross-platform** — macOS (arm64/amd64) and Linux (amd64/arm64)
-- **GUI** — Cross-platform desktop app via Fyne
+- **GUI** — Cross-platform desktop app with 5 streamlined tabs (Transfer, Files, Remote, Connect, Settings)
 
 ## Quick Start
 
@@ -243,6 +243,26 @@ The main CLI and GUI require CGO for the post-quantum crypto library. Prebuilt s
 - `linux-arm64` (ARM64 Linux)
 
 The `ztransfer-mint` and `ztransfer-audit` binaries are pure Go with no CGO dependency.
+
+## GUI
+
+The desktop app (`ztransfer-gui`) provides a graphical interface with five tabs:
+
+| Tab | What it does |
+|-----|-------------|
+| **Transfer** | Browse remote files, download, upload, drag-and-drop |
+| **Files** | Browse local files with preview and syntax highlighting |
+| **Remote** | Connect to remote machines — see screen, run commands, or let AI control |
+| **Connect** | Start sharing files and pair with other machines (all in one place) |
+| **Settings** | Preferences, identity info, guide, plus advanced tools (audit logs, tokens) |
+
+The **Remote** tab offers four connection modes:
+- **Command Line** — interactive terminal shell
+- **See & Control Screen** — live remote desktop with mouse/keyboard
+- **Watch Screen Only** — read-only screen view for monitoring
+- **AI Assistant** — headless mode for AI agent control loops
+
+Audit log verification and token minting are available under **Settings** for advanced users.
 
 ## Project Structure
 

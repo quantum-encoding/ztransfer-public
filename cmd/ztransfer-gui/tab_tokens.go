@@ -24,10 +24,9 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 	loginStatusLabel := widget.NewLabel("")
 	loginStatusLabel.TextStyle = fyne.TextStyle{Monospace: true}
 
-	emailLabel := widget.NewLabel("Not logged in")
-	emailLabel.TextStyle = fyne.TextStyle{Bold: true}
+	emailLabel := selectableLabel("Not logged in")
 
-	expiryLabel := widget.NewLabel("")
+	expiryLabel := selectableLabel("")
 
 	// Check for existing credentials on load.
 	if creds, err := auth.LoadCredentials(); err == nil {
@@ -115,9 +114,9 @@ func (c *Controller) BuildTokensTab() fyne.CanvasObject {
 	mintStatusLabel := widget.NewLabel("")
 	mintStatusLabel.TextStyle = fyne.TextStyle{Monospace: true}
 
-	sourceLabel := widget.NewLabel("—")
-	saLabel := widget.NewLabel("—")
-	audienceLabel := widget.NewLabel("—")
+	sourceLabel := selectableLabel("—")
+	saLabel := selectableLabelMono("—")
+	audienceLabel := selectableLabelMono("—")
 
 	mintBtn := widget.NewButtonWithIcon("Mint Token", theme.ConfirmIcon(), func() {
 		scope := scopeSelect.Selected

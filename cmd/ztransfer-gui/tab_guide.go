@@ -56,11 +56,8 @@ When direct connections fail (strict corporate firewalls, CGNAT), sessions route
 - **Transfer** — Send and receive files between paired machines
 - **Files** — Browse and manage local files shared by the server
 - **Remote** — Connect to remote machines via warp code
-- **Server** — Start/stop the file sharing server
-- **Peers** — Manage paired machines
-- **Audit** — View and verify tamper-evident session logs
-- **Tokens** — Mint scoped authentication tokens
-- **Settings** — Preferences, identity info, and this guide
+- **Connect** — Start sharing and pair with other machines (all in one place)
+- **Settings** — Preferences, identity, guide, plus advanced tools (audit logs, tokens)
 `)
 }
 
@@ -69,10 +66,11 @@ func buildGuideTransfer() fyne.CanvasObject {
 
 ## Sending Files
 
-1. Start the server on the machine sharing files (Server tab)
-2. On the receiving machine, pair with the server (Peers tab)
-3. In the Transfer tab, select the peer and browse their files
-4. Click **Download** to receive files, or drag local files to upload
+1. Go to the **Connect** tab and click **Start Sharing** to share a folder
+2. Share the **Pair Token** with the other person
+3. On the other machine, go to **Connect** → **Pair New Machine** and enter the address + token
+4. Once paired, go to the **Transfer** tab, select the peer, and browse their files
+5. Click **Download** to receive files, or drag local files to upload
 
 ## Pairing
 
@@ -113,16 +111,16 @@ Warp codes are:
 
 ## Connection Modes
 
-### Terminal
+### Command Line
 Interactive PTY shell over the encrypted tunnel. Full terminal emulation with resize support. Use the CLI for this mode — Fyne doesn't have a terminal widget.
 
-### Viewer (Control)
+### See & Control Screen
 Live screenshot stream of the remote desktop with mouse and keyboard forwarding. Like lightweight VNC over an encrypted tunnel. Screenshots are JPEG-compressed (107KB per frame) for bandwidth efficiency.
 
-### Viewer (Watch)
+### Watch Screen Only
 Same live screenshot stream but **read-only** — no mouse or keyboard input is forwarded. Good for monitoring or guided troubleshooting where the remote user keeps control.
 
-### Computer Use (AI)
+### AI Assistant
 Headless mode for AI agents (Claude, GPT, Gemini). The AI sends actions (click, type, scroll) and receives screenshots through the REST API. Used for automated diagnostics and repair.
 
 ## How to Connect
@@ -221,7 +219,7 @@ This creates a **blockchain-like chain** where modifying, inserting, or removing
 
 ## Verification
 
-Open an NDJSON audit log in the **Audit tab** to:
+Open an NDJSON audit log in **Settings → Audit Logs** to:
 
 1. Verify the hash chain is intact (no tampering)
 2. Browse individual events with timestamps

@@ -7,7 +7,45 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 )
+
+// selectableLabel creates a read-only Entry that looks like a label
+// but allows text selection and copying. Use for values users may
+// want to copy (addresses, tokens, fingerprints, etc.).
+func selectableLabel(text string) *widget.Entry {
+	e := widget.NewEntry()
+	e.SetText(text)
+	e.Disable()
+	return e
+}
+
+// selectableLabelMono creates a monospace selectable label.
+func selectableLabelMono(text string) *widget.Entry {
+	e := widget.NewEntry()
+	e.TextStyle = fyne.TextStyle{Monospace: true}
+	e.SetText(text)
+	e.Disable()
+	return e
+}
+
+// selectableMultiLine creates a read-only multi-line Entry for longer
+// selectable text content.
+func selectableMultiLine(text string) *widget.Entry {
+	e := widget.NewMultiLineEntry()
+	e.SetText(text)
+	e.Disable()
+	return e
+}
+
+// selectableMultiLineMono creates a monospace multi-line selectable entry.
+func selectableMultiLineMono(text string) *widget.Entry {
+	e := widget.NewMultiLineEntry()
+	e.TextStyle = fyne.TextStyle{Monospace: true}
+	e.SetText(text)
+	e.Disable()
+	return e
+}
 
 // panel wraps content in a bordered container with a subtle background
 // tint and rounded border. Adapts to dark/light mode via theme colors.

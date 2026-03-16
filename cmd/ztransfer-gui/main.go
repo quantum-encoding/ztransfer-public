@@ -34,11 +34,8 @@ func main() {
 		container.NewTabItemWithIcon("Transfer", theme.DownloadIcon(), ctrl.BuildTransferTab(w)),
 		container.NewTabItemWithIcon("Files", theme.FolderIcon(), ctrl.BuildFilesTab(w)),
 		container.NewTabItemWithIcon("Remote", theme.MediaPlayIcon(), ctrl.BuildRemoteTab(w)),
-		container.NewTabItemWithIcon("Server", theme.ComputerIcon(), ctrl.BuildServerTab(w)),
-		container.NewTabItemWithIcon("Peers", theme.AccountIcon(), ctrl.BuildPeersTab()),
-		container.NewTabItemWithIcon("Audit", theme.VisibilityIcon(), ctrl.BuildAuditTab(w)),
-		container.NewTabItemWithIcon("Tokens", theme.LoginIcon(), ctrl.BuildTokensTab()),
-		container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), ctrl.BuildSettingsTab(a)),
+		container.NewTabItemWithIcon("Connect", theme.ComputerIcon(), ctrl.BuildConnectTab(w)),
+		container.NewTabItemWithIcon("Settings", theme.SettingsIcon(), ctrl.BuildSettingsTab(a, w)),
 	)
 	tabs.SetTabLocation(container.TabLocationTop)
 

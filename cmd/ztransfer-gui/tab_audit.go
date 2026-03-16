@@ -21,13 +21,13 @@ import (
 // BuildAuditTab creates the session audit log viewer and verifier.
 func (c *Controller) BuildAuditTab(w fyne.Window) fyne.CanvasObject {
 	// === Verification result ===
-	verifyResult := widget.NewLabelWithStyle("No log loaded", fyne.TextAlignLeading, fyne.TextStyle{Monospace: true})
-	sessionID := widget.NewLabel("—")
-	operatorLabel := widget.NewLabel("—")
-	targetLabel := widget.NewLabel("—")
-	eventCount := widget.NewLabel("—")
-	startLabel := widget.NewLabel("—")
-	endLabel := widget.NewLabel("—")
+	verifyResult := selectableLabelMono("No log loaded")
+	sessionID := selectableLabelMono("—")
+	operatorLabel := selectableLabel("—")
+	targetLabel := selectableLabel("—")
+	eventCount := selectableLabel("—")
+	startLabel := selectableLabel("—")
+	endLabel := selectableLabel("—")
 
 	// === Event list ===
 	var events []audit.Event
