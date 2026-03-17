@@ -106,7 +106,7 @@ func (s *Server) Start() error {
 			OK:      true,
 			Message: "ztransfer API",
 			Data: map[string]string{
-				"version":  "0.1.0",
+				"version":  "0.2.0",
 				"docs":     "GET /api/help",
 				"identity": s.Identity.Name,
 			},
@@ -121,18 +121,22 @@ func (s *Server) Start() error {
 		WriteTimeout: 10 * time.Minute,
 	}
 
-	fmt.Printf("\n  ztransfer API running\n")
+	fmt.Printf("\n  ztransfer API v0.2.0\n")
 	fmt.Printf("  %-14s http://%s\n", "Endpoint:", addr)
 	fmt.Printf("  %-14s %s\n", "Identity:", s.Identity.Name)
 	fmt.Printf("  %-14s %s\n", "Fingerprint:", s.Identity.Fingerprint())
 	fmt.Printf("  %-14s %d paired\n", "Peers:", len(s.PeerStore.ListPeers()))
-	fmt.Printf("\n  Claude Code usage:\n")
+	fmt.Printf("\n  File transfer:\n")
 	fmt.Printf("    curl http://%s/api/peers\n", addr)
 	fmt.Printf("    curl http://%s/api/ls?peer=NAME&path=/\n", addr)
-	fmt.Printf("    curl -X POST http://%s/api/get -d '{\"peer\":\"NAME\",\"remote_path\":\"/file.txt\",\"local_path\":\"/tmp/\"}'\n", addr)
-	fmt.Printf("    curl -X POST http://%s/api/put -d '{\"peer\":\"NAME\",\"local_path\":\"/tmp/file.txt\",\"remote_path\":\"/\"}'\n", addr)
-	fmt.Printf("    curl 'http://%s/api/receive?peer=NAME&path=/file.txt' > file.txt\n", addr)
-	fmt.Printf("    curl -X POST http://%s/api/send -F file=@/tmp/file.txt -F peer=NAME -F remote_path=/\n", addr)
+	fmt.Printf("    curl -X POST http://%s/api/get -d '{\"peer\":\"NAME\",\"remote_path\":\"/file\",\"local_path\":\"/tmp/\"}'\n", addr)
+	fmt.Printf("    curl -X POST http://%s/api/put -d '{\"peer\":\"NAME\",\"local_path\":\"/tmp/file\",\"remote_path\":\"/\"}'\n", addr)
+	fmt.Printf("\n  Remote execution (warp code from: ztransfer remote host):\n")
+	fmt.Printf("    curl -X POST http://%s/api/remote/exec -d '{\"code\":\"warp-CODE\",\"command\":\"uname -a\"}'\n", addr)
+	fmt.Printf("\n  Computer use:\n")
+	fmt.Printf("    curl -X POST http://%s/api/remote/computer/start -d '{\"code\":\"warp-CODE\"}'\n", addr)
+	fmt.Printf("    curl 'http://%s/api/remote/computer/screen?session=SESSION'\n", addr)
+	fmt.Printf("\n  Full docs: curl http://%s/api/help\n", addr)
 	fmt.Println()
 
 	return srv.ListenAndServe()
@@ -364,24 +368,48 @@ func (s *Server) handleReceive(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleHelp(w http.ResponseWriter, r *http.Request) {
 	help := map[string]any{
-		"description": "ztransfer local API — programmatic file transfer for Claude Code",
-		"endpoints": map[string]string{
-			"GET  /api/status":  "Server status, identity, and peer list",
-			"GET  /api/peers":   "List all paired peers with addresses and fingerprints",
-			"GET  /api/ls":      "List remote files. Params: peer, path (default: /)",
-			"POST /api/get":     "Download remote file. Body: {peer, remote_path, local_path?}",
-			"POST /api/put":     "Upload local file. Body: {peer, local_path, remote_path?}",
-			"POST /api/send":    "Send file via multipart. Fields: file, peer, remote_path",
-			"GET  /api/receive": "Stream remote file content. Params: peer, path",
-			"GET  /api/help":    "This help message",
+		"description": "ztransfer local API — file transfer, remote execution & computer use for Claude Code",
+		"endpoints": map[string]any{
+			"file_transfer": map[string]string{
+				"GET  /api/status":  "Server status, identity, and peer list",
+				"GET  /api/peers":   "List all paired peers with addresses and fingerprints",
+				"GET  /api/ls":      "List remote files. Params: peer, path (default: /)",
+				"POST /api/get":     "Download remote file. Body: {peer, remote_path, local_path?}",
+				"POST /api/put":     "Upload local file. Body: {peer, local_path, remote_path?}",
+				"POST /api/send":    "Send file via multipart. Fields: file, peer, remote_path",
+				"GET  /api/receive": "Stream remote file content. Params: peer, path",
+			},
+			"remote_execution": map[string]string{
+				"POST /api/remote/exec":       "Execute command on remote machine. Body: {code, command, args?, dir?, host?}",
+				"POST /api/remote/connect":    "Establish persistent remote session. Body: {code, host?}",
+				"POST /api/remote/disconnect": "Close persistent remote session. Body: {code}",
+				"GET  /api/remote/sessions":   "List active remote sessions",
+				"POST /api/remote/host":       "Start hosting a remote session (returns warp code)",
+			},
+			"computer_use": map[string]string{
+				"POST /api/remote/computer/start":    "Start computer use session. Body: {code, host?}",
+				"GET  /api/remote/computer/screen":   "Capture screenshot. Params: session, format?, quality?, scale?",
+				"POST /api/remote/computer/action":   "Execute mouse/keyboard action. Body: {session, action: {type, ...}}",
+				"GET  /api/remote/computer/info":     "Get display info. Params: session",
+				"POST /api/remote/computer/stop":     "End computer use session. Body: {session}",
+				"GET  /api/remote/computer/sessions": "List active computer use sessions",
+			},
+			"other": map[string]string{
+				"GET  /api/help": "This help message",
+				"GET  /viewer":  "Web-based remote desktop viewer",
+			},
 		},
 		"examples": map[string]string{
-			"list_peers":    "curl http://localhost:9877/api/peers",
-			"list_files":    "curl 'http://localhost:9877/api/ls?peer=linux-box&path=/'",
-			"download":      "curl -X POST http://localhost:9877/api/get -d '{\"peer\":\"linux-box\",\"remote_path\":\"/data.csv\",\"local_path\":\"/tmp/\"}'",
-			"upload":        "curl -X POST http://localhost:9877/api/put -d '{\"peer\":\"linux-box\",\"local_path\":\"/tmp/report.pdf\",\"remote_path\":\"/inbox/\"}'",
-			"pipe_download": "curl 'http://localhost:9877/api/receive?peer=linux-box&path=/data.csv' > data.csv",
-			"pipe_upload":   "curl -X POST http://localhost:9877/api/send -F file=@data.csv -F peer=linux-box -F remote_path=/inbox/",
+			"list_peers":     "curl http://localhost:9877/api/peers",
+			"list_files":     "curl 'http://localhost:9877/api/ls?peer=linux-box&path=/'",
+			"download":       "curl -X POST http://localhost:9877/api/get -d '{\"peer\":\"linux-box\",\"remote_path\":\"/data.csv\",\"local_path\":\"/tmp/\"}'",
+			"upload":         "curl -X POST http://localhost:9877/api/put -d '{\"peer\":\"linux-box\",\"local_path\":\"/tmp/report.pdf\",\"remote_path\":\"/inbox/\"}'",
+			"pipe_download":  "curl 'http://localhost:9877/api/receive?peer=linux-box&path=/data.csv' > data.csv",
+			"pipe_upload":    "curl -X POST http://localhost:9877/api/send -F file=@data.csv -F peer=linux-box -F remote_path=/inbox/",
+			"remote_exec":    "curl -X POST http://localhost:9877/api/remote/exec -d '{\"code\":\"warp-429-delta\",\"command\":\"uname -a\"}'",
+			"computer_start": "curl -X POST http://localhost:9877/api/remote/computer/start -d '{\"code\":\"warp-429-delta\"}'",
+			"screenshot":     "curl 'http://localhost:9877/api/remote/computer/screen?session=cu-abc123&format=jpeg&quality=65'",
+			"click":          "curl -X POST http://localhost:9877/api/remote/computer/action -d '{\"session\":\"cu-abc123\",\"action\":{\"type\":\"click\",\"x\":500,\"y\":300}}'",
 		},
 	}
 	writeJSON(w, 200, apiResponse{OK: true, Data: help})
