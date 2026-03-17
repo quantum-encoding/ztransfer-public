@@ -10,41 +10,87 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// selectableLabel creates a read-only Entry that looks like a label
-// but allows text selection and copying. Use for values users may
-// want to copy (addresses, tokens, fingerprints, etc.).
+// readOnlyEntry is a widget.Entry that allows text selection and copying
+// but rejects keyboard input. Fyne's Disable() blocks all interaction
+// including selection, so this custom widget intercepts key events instead.
+type readOnlyEntry struct {
+	widget.Entry
+}
+
+func newReadOnlyEntry(text string) *readOnlyEntry {
+	e := &readOnlyEntry{}
+	e.ExtendBaseWidget(e)
+	e.SetText(text)
+	return e
+}
+
+func newReadOnlyEntryMono(text string) *readOnlyEntry {
+	e := &readOnlyEntry{}
+	e.ExtendBaseWidget(e)
+	e.TextStyle = fyne.TextStyle{Monospace: true}
+	e.SetText(text)
+	return e
+}
+
+func newReadOnlyMultiLine(text string) *readOnlyEntry {
+	e := &readOnlyEntry{}
+	e.MultiLine = true
+	e.Wrapping = fyne.TextWrapBreak
+	e.ExtendBaseWidget(e)
+	e.SetText(text)
+	return e
+}
+
+func newReadOnlyMultiLineMono(text string) *readOnlyEntry {
+	e := &readOnlyEntry{}
+	e.MultiLine = true
+	e.Wrapping = fyne.TextWrapBreak
+	e.TextStyle = fyne.TextStyle{Monospace: true}
+	e.ExtendBaseWidget(e)
+	e.SetText(text)
+	return e
+}
+
+// TypedRune ignores character input — makes the entry read-only.
+func (e *readOnlyEntry) TypedRune(_ rune) {}
+
+// TypedKey allows only selection/copy shortcuts and rejects editing keys.
+func (e *readOnlyEntry) TypedKey(ev *fyne.KeyEvent) {
+	// Allow cursor movement for selection
+	switch ev.Name {
+	case fyne.KeyLeft, fyne.KeyRight, fyne.KeyUp, fyne.KeyDown,
+		fyne.KeyHome, fyne.KeyEnd, fyne.KeyPageUp, fyne.KeyPageDown:
+		e.Entry.TypedKey(ev)
+	}
+	// Block Delete, Backspace, Return, Tab, etc.
+}
+
+// TypedShortcut allows copy (Ctrl/Cmd+C) and select-all (Ctrl/Cmd+A)
+// but blocks cut, paste, and other editing shortcuts.
+func (e *readOnlyEntry) TypedShortcut(s fyne.Shortcut) {
+	switch s.(type) {
+	case *fyne.ShortcutCopy, *fyne.ShortcutSelectAll:
+		e.Entry.TypedShortcut(s)
+	}
+}
+
+// Convenience constructors that return *widget.Entry for compatibility
+// with existing callers that use .SetText(), .Text, etc.
+
 func selectableLabel(text string) *widget.Entry {
-	e := widget.NewEntry()
-	e.SetText(text)
-	e.Disable()
-	return e
+	return &newReadOnlyEntry(text).Entry
 }
 
-// selectableLabelMono creates a monospace selectable label.
 func selectableLabelMono(text string) *widget.Entry {
-	e := widget.NewEntry()
-	e.TextStyle = fyne.TextStyle{Monospace: true}
-	e.SetText(text)
-	e.Disable()
-	return e
+	return &newReadOnlyEntryMono(text).Entry
 }
 
-// selectableMultiLine creates a read-only multi-line Entry for longer
-// selectable text content.
 func selectableMultiLine(text string) *widget.Entry {
-	e := widget.NewMultiLineEntry()
-	e.SetText(text)
-	e.Disable()
-	return e
+	return &newReadOnlyMultiLine(text).Entry
 }
 
-// selectableMultiLineMono creates a monospace multi-line selectable entry.
 func selectableMultiLineMono(text string) *widget.Entry {
-	e := widget.NewMultiLineEntry()
-	e.TextStyle = fyne.TextStyle{Monospace: true}
-	e.SetText(text)
-	e.Disable()
-	return e
+	return &newReadOnlyMultiLineMono(text).Entry
 }
 
 // panel wraps content in a bordered container with a subtle background
