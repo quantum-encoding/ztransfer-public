@@ -46,6 +46,8 @@ func main() {
 		cmdStatus(os.Args[2:])
 	case "remote":
 		cmdRemote(os.Args[2:])
+	case "users":
+		cmdUsers()
 	case "login":
 		cmdLogin()
 	case "logout":
@@ -101,6 +103,9 @@ Remote Access:
   remote connect    Connect to a hosted session
   remote shell      Open interactive shell on remote machine
   remote exec       Run a single command on remote machine
+
+Discovery:
+  users             List online users with active sessions
 
 Authentication:
   login             Sign in with Google (opens browser)
@@ -469,6 +474,41 @@ func cmdRemote(args []string) {
 
 		fmt.Printf("\n  Remote session active\n")
 		fmt.Printf("  Warp code: %s\n", session.WarpCode)
+
+		// Auto-register session in Firestore if logged in
+		if creds, err := auth.LoadCredentials(); err == nil {
+			if idToken, err := creds.GetIDToken(); err == nil {
+				regSession := &auth.ActiveSession{
+					Email:       creds.Email,
+					SessionID:   session.WarpCode,
+					MachineName: hostname(),
+					Status:      "hosting",
+					RelayURL:    nat.DefaultRelayURL,
+				}
+				if err := auth.RegisterSession(idToken, regSession); err != nil {
+					fmt.Fprintf(os.Stderr, "  warning: could not register session: %v\n", err)
+				} else {
+					fmt.Printf("  Registered as %s — visible to authorized users\n", creds.Email)
+				}
+				// Start heartbeat in background
+				go func() {
+					ticker := time.NewTicker(30 * time.Second)
+					defer ticker.Stop()
+					for range ticker.C {
+						if t, err := creds.GetIDToken(); err == nil {
+							auth.HeartbeatSession(t, creds.Email)
+						}
+					}
+				}()
+				// Clean up on exit
+				defer func() {
+					if t, err := creds.GetIDToken(); err == nil {
+						auth.RemoveSession(t, creds.Email)
+					}
+				}()
+			}
+		}
+
 		fmt.Printf("  Waiting for connections...\n\n")
 
 		// Serve incoming requests (blocks)
@@ -569,6 +609,46 @@ func formatBytes(b int64) string {
 func fatal(format string, args ...any) {
 	fmt.Fprintf(os.Stderr, "  error: "+format+"\n", args...)
 	os.Exit(1)
+}
+
+// --------------------------------------------------------------------------
+// Discovery commands
+// --------------------------------------------------------------------------
+
+func cmdUsers() {
+	creds, err := auth.LoadCredentials()
+	if err != nil {
+		fatal("not logged in — run 'ztransfer login' first")
+	}
+
+	idToken, err := creds.GetIDToken()
+	if err != nil {
+		fatal("refresh token: %v", err)
+	}
+
+	sessions, err := auth.ListActiveSessions(idToken)
+	if err != nil {
+		fatal("list sessions: %v", err)
+	}
+
+	if len(sessions) == 0 {
+		fmt.Println("  No users online.")
+		return
+	}
+
+	fmt.Printf("  Online users (%d):\n\n", len(sessions))
+	tw := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
+	fmt.Fprintf(tw, "  EMAIL\tMACHINE\tSTATUS\tWARP CODE\tLAST SEEN\n")
+	fmt.Fprintf(tw, "  ─────\t───────\t──────\t─────────\t─────────\n")
+	for _, s := range sessions {
+		ago := time.Since(s.LastSeen).Round(time.Second)
+		fmt.Fprintf(tw, "  %s\t%s\t%s\t%s\t%s ago\n",
+			s.Email, s.MachineName, s.Status, s.SessionID, ago)
+	}
+	tw.Flush()
+
+	fmt.Println()
+	fmt.Println("  Connect: ztransfer remote shell <WARP CODE>")
 }
 
 // --------------------------------------------------------------------------
